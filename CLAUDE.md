@@ -87,10 +87,12 @@ The app stays light even when the phone is in dark mode.
 
 ## Data sources (details in docs/commissary-data.md)
 
-- Commissaries: the Freshop API behind shop.commissaries.com. Not a public API. Pull at most once a
-  week per store, never try to get around reCAPTCHA, and read the site's terms before phase 2.
-  Every price stores its source and "checked at" time; the app must keep working on last known
-  prices if a source breaks.
+- Commissaries: **no automated access to shop.commissaries.com.** Its terms forbid automatic
+  monitoring or copying, and calling its Freshop API is treated as circumventing the site. Instead,
+  we download the weekly sales flyer PDF ourselves and upload it in the app; an edge function has
+  Claude read it into prices (source "flyer") for us to confirm. Shelf prices come from manual entry
+  and, later, receipts. Every price stores its source and "checked at" time; the app keeps working
+  on last known prices.
 - German stores: weekly offers from a flyer aggregator. Shelf prices come from receipts and manual
   entry.
 - Recipes: our own box, link imports, DeCA recipes, AI suggestions. Personal use only; if the app is
@@ -100,10 +102,15 @@ The app stays light even when the phone is in dark mode.
 
 1. Foundation: Supabase project + tables, sign-in for two users, four tabs styled like the mockups
    with sample data, week arrows on Plan.
-2. Commissary prices: weekly sync edge function (Ramstein 5873 and Vogelweh 5921, shown as one
-   "Commissary"), unit prices, manual recipes, DeCA recipes, read-only recipe page.
-3. German stores and the list: flyer offers, exchange rate, ingredient matching, list by store,
+2. Prices, Globus first: our own recipes, products and manual prices; a Monday edge function that
+   downloads the public Globus Kaiserslautern flyer PDF and has Claude read it (fully automatic);
+   commissary flyer PDF upload (Ramstein 5873 and Vogelweh 5921, shown as one "Commissary") read
+   the same way and confirmed by us; unit prices, real recipe costs, read-only recipe page,
+   building a week by hand. No automated commissary access (we've asked DeCA for permission) and
+   no DeCA recipes. Sample data stays until we've entered a few real recipes, then is cleared.
+3. Other German stores and the list: REWE / Lidl / Aldi only where their terms allow automated
+   use (Kaufland is behind bot protection: skip), exchange rate, ingredient matching, list by store,
    max stops, list editing (add, remove / "have it", quantities; edits survive a rebuild).
 4. Planner and imports: cheapest week, lock/swap/rebuild, move/skip mid-week, Luke's usuals, link
    import, full recipe page and cook mode.
-5. AI: suggestions, screenshot import, receipt scanning.
+5. AI: suggestions, screenshot import, receipt scanning (flyer reading moved to phase 2).

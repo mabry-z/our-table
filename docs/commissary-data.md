@@ -44,3 +44,40 @@ unit, and a product photo.
 - Inspect the real requests and responses yourself (browser devtools, Network tab, Fetch/XHR) before
   writing the sync. The parameters above were not captured.
 - If the endpoints stop working, fall back to last known prices, receipts and manual entry.
+
+## Findings from Oct 28, 2026 (phase 2a, from normal browsing only)
+
+- **Stores:** Ramstein AB is store_id **5873**; Vogelweh (Pulaski Barracks) is store_id **5921**.
+- **Terms:** the site requires accepting its Terms and Conditions. They forbid using "any automatic
+  device to monitor or copy" the site. See the decision at the end: no automated
+  access; we upload the flyer PDF ourselves.
+- **Price comparison (13 everyday items):** most packaged prices and the Europe flyer match between
+  the two stores. Store-packed meat (ground sirloin $7.46 vs $8.79/lb) and some store markdowns
+  differ, and stock differs. The app tracks both and shows one "Commissary" label.
+- **How the shop page loads data** (requests the page itself made, seen in the browser's resource
+  list; response bodies were not inspected):
+  - Script: `asset.prd.freshop.retail.ncrgov.com/freshop.js?app_key=deca&...` loads the shop.
+  - Session: `api.prd.freshop.retail.ncrgov.com/2/sessions/<token>?app_key=deca`; every later
+    request carries `app_key=deca` and `token=<session token>`.
+  - Product search: `/1/products?app_key=deca&q=<text>&store_id=5873&limit=24&sort=relevance&fields=...`
+    where `fields` includes `id, identifier, upc, name, size, price, sale_price, sale_start_date,
+    sale_finish_date, unit_price, quantity_size_ratio_description, status`.
+  - Search suggestions: `/1/product_search_suggestions?app_key=deca&q=<text>&store_id=5873`.
+  - Also seen: `/1/stores`, `/1/tags`, `/2/shopping_lists`, `/1/products/ads`, `/1/store_slots`.
+- **Not yet known:** the response format, whether products can be fetched by a list of ids
+  (needed for a light weekly refresh), and how the flyer (`/1/circulars`) is requested.
+- **Blocked:** calling these endpoints directly (outside the page's own browsing) was refused by
+  Claude Code's safety check as circumventing the site's access controls.
+
+## Decision (Oct 28, 2026): no automated access
+
+We don't call the Freshop API or scrape the site, not even for sale items only: the flyer comes
+from the same service and the terms forbid any automatic monitoring or copying. Instead:
+
+- Each new flyer, we open the weekly ad on shop.commissaries.com (Ramstein selected), download the
+  PDF ourselves, and upload it in the app.
+- An edge function sends the PDF to Claude, which returns each item (name, size, sale price,
+  regular price, valid dates). We review and confirm before anything is saved, as source "flyer".
+- The Europe flyer is shared, so confirmed flyer prices apply to both Ramstein and Vogelweh unless
+  we mark an item as one store only.
+- Shelf (non-sale) prices come from manual entry now and receipt scanning later.

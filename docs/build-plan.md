@@ -19,7 +19,7 @@ A phone web app like Cadence, backed by Supabase; anything that touches outside 
 Web app on our phones (Plan, Recipes, List, Settings; GitHub Pages)
         <->  Supabase
                - Database and sign-in (household, recipes, plans, products and dated prices)
-               - Edge functions (weekly price sync on Mondays, recipe import, dinner suggestions,
+               - Edge functions (flyer reading, recipe import, dinner suggestions,
                  receipt reading; holds the AI key)
                     ->  Ramstein / Vogelweh commissary (Freshop catalog and flyer)
                     ->  German store flyers (weekly offers)
@@ -27,7 +27,7 @@ Web app on our phones (Plan, Recipes, List, Settings; GitHub Pages)
                     ->  Claude API (suggestions and reading)
 ```
 
-The app reads and saves only through Supabase. A scheduled edge function pulls prices every Monday; the AI functions run when we tap Suggest, Import or scan a receipt.
+The app reads and saves only through Supabase. The AI functions run when we upload a flyer, tap Suggest, import a recipe or scan a receipt.
 
 ## Data sources
 
@@ -35,7 +35,7 @@ The commissary gives us the richest data (full catalog plus sales); German store
 
 | Source | What we get | How we get it | Refresh | Caveat |
 | --- | --- | --- | --- | --- |
-| Ramstein commissary (CLICK2GO) | Full catalog prices, weekly flyer with sale and regular prices, DeCA recipes, digital coupons | Freshop endpoints behind shop.commissaries.com (`products`, `circulars`, `recipes`, `offers`), anonymous session, Ramstein store ID 5873, Vogelweh ID to look up | Weekly, Monday | Not a public API; site uses reCAPTCHA and has its own terms. Gentle, once-a-week pulls only |
+| Ramstein / Vogelweh commissary | Weekly flyer with sale and regular prices | We download the flyer PDF from shop.commissaries.com ourselves and upload it; Claude reads it in an edge function and we confirm. Store IDs 5873 and 5921 | Each new flyer | No automated access: the site's terms forbid automatic monitoring or copying |
 | Lidl, Aldi, Kaufland, Globus, REWE | Weekly offers (sale price, regular price, unit, validity dates) | A flyer aggregator such as Marktguru, or a paid unofficial scraper | Weekly | Mostly deals, not full shelf prices; Kaufland is harder to read |
 | Receipts | Real prices we actually paid, any store | Photo of receipt → AI reads line items → matched to products | Every trip | Fills shelf prices the flyers miss |
 | Manual entry | One-off prices | Tap a price on the list to correct it | As needed | Always overrides older data |
@@ -100,7 +100,7 @@ Build in five phases so the app is useful from phase 2 onward; each ends with so
 
 1. **Foundation.** Supabase project, tables, sign-in for both of us, the four tabs with the farmhouse styling and sample data; Plan switches between this week and next.
    - Done when: the prototype runs on our phones against a real database.
-2. **Commissary prices.** Edge function that pulls Ramstein's and Vogelweh's catalog and flyer weekly (shown as one "Commissary", naming the store only when one is cheaper); price per unit; recipe box with manual recipes; DeCA recipes; a read-only recipe page when tapping a dinner.
+2. **Prices, Globus first.** A Monday edge function downloads the public Globus Kaiserslautern flyer PDF (`globus.de/faltblatt_online/<YYYYWW>/kla/...`) and has Claude read it, with no work from us. Our own recipes; commissary products and prices we enter (Ramstein and Vogelweh shown as one "Commissary", naming the store only when one is cheaper); price per unit; upload of the weekly sales flyer PDF we download ourselves, read by Claude in an edge function and confirmed by us; real recipe costs; a read-only recipe page when tapping a dinner; building a week by hand. No automated access to the commissary site (its terms forbid it) and no DeCA recipes.
    - Done when: a manually built week shows real commissary costs.
 3. **German stores and the list.** Flyer offers for the stores we pick, exchange rate, ingredient matching with confirmations, shopping list by store, max stops; list editing (add our own items, remove or mark "have it", change quantities, and keep our edits when the list is rebuilt).
    - Done when: we shop a full week from the app's list.
@@ -118,7 +118,7 @@ The biggest risk is depending on data sources we don't control; the app should k
 | Risk | Impact | Fallback |
 | --- | --- | --- |
 | Commissary site changes or blocks requests | No fresh commissary prices | Keep last prices with a "last checked" date; receipts and manual entry |
-| Commissary terms or reCAPTCHA | Automated pulls not allowed | Two stores, once a week; never bypass the CAPTCHA; read the terms before phase 2 |
+| Commissary terms | Automated pulls not allowed (confirmed Oct 28) | We download the flyer ourselves and upload it; shelf prices from manual entry and receipts |
 | German flyers only cover deals | Shelf prices missing for staples | Receipt scanning; manual prices |
 | Ingredient matching picks the wrong product | Wrong totals | Confirm matches once; confirmed matches always win |
 | AI key exposed in the front end | Someone runs up the bill | Key only in a Supabase edge function |
