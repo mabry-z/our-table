@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Full app prototype (Plan, Recipes, List, Settings)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<style>
+:root{--surface-1:#ECE6DC;--font-sans:system-ui,-apple-system,"Segoe UI",sans-serif}
+body{margin:0;padding:24px 12px;background:#E9E3D9;font-family:var(--font-sans)}
+button{font-family:inherit}
+.note{max-width:380px;margin:0 auto 14px;font:13px/1.5 var(--font-sans);color:#6B6157}
+</style></head><body>
+<p class="note"><b>Full app prototype (Plan, Recipes, List, Settings)</b> · Approved design reference. Prices, stores and recipes are sample data.</p>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Lato:wght@400&display=swap" rel="stylesheet">
+<style>
+.ph{position:relative;max-width:380px;margin:0 auto;background:#F7F3EC;border:1px solid #E4DCCF;border-radius:28px;font-family:Lato,var(--font-sans);font-size:14px;color:#2F2B26;overflow:hidden}
+.bd{padding:22px 18px 16px;min-height:640px}
+.sf{font-family:'Cormorant Garamond',Georgia,serif;font-weight:500}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cd{background:#FFFDF9;border:1px solid #E9E2D6;border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.mu{color:#857B6F;font-size:12px}
+.ey{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#857B6F}
+.pl{font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.ib{background:transparent;border:1px solid #DCD3C5;border-radius:999px;color:#5E564C;font-size:12px;padding:5px 11px;height:auto;font-family:inherit;cursor:pointer}
+.dk{background:#2F2B26;border-color:#2F2B26;color:#F7F3EC}
+.ch{border-radius:999px;padding:6px 12px;font-size:12px;font-family:inherit;cursor:pointer;height:auto;display:inline-flex;align-items:center;gap:5px}
+.sg{display:flex;border:1px solid #DCD3C5;border-radius:999px;overflow:hidden}
+.sg button{border:none;border-radius:0;background:transparent;font-family:inherit;font-size:12px;padding:6px 12px;color:#5E564C;height:auto;cursor:pointer}
+.sg button.a{background:#2F2B26;color:#F7F3EC}
+.it{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid #EFE8DC;cursor:pointer}
+.bx{width:18px;height:18px;border:1px solid #B9A88F;border-radius:5px;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px}
+.in{width:100%;box-sizing:border-box;background:#FFFDF9;border:1px solid #DCD3C5;border-radius:999px;padding:8px 14px;font-family:inherit;font-size:13px;color:#2F2B26;height:auto}
+.tb{display:flex;border-top:1px solid #E4DCCF;background:#FFFDF9}
+.tb button{flex:1;border:none;border-radius:0;background:transparent;font-family:inherit;font-size:11px;color:#9A9085;padding:10px 0 12px;height:auto;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer}
+.tb button.a{color:#2F2B26}
+.hd{text-align:center;margin-bottom:16px}
+.ln{width:36px;border-top:1px solid #B9A88F;margin:10px auto 0}
+</style>
+<div style="background:var(--surface-1);border-radius:12px;padding:1.25rem 0">
+<div class="ph" id="app"><div class="bd" id="body"></div><div class="tb" id="tabs"></div><div id="sheet"></div></div>
+</div>
+<script>
+const SB={Commissary:'#E3E8D8',Lidl:'#DFE6EC',Aldi:'#F1E7D2',Kaufland:'#F2E0D6',Globus:'#EAE3D3',REWE:'#F1DCDC'},SC={Commissary:'#4F5E3E',Lidl:'#3F5566',Aldi:'#6E5527',Kaufland:'#7A4632',Globus:'#5E5338',REWE:'#7A3434'};
+const ALL=Object.keys(SB);
+const S={tab:'plan',def:{on:{Commissary:1,Lidl:1,Aldi:1,Kaufland:1,Globus:0,REWE:0},max:0},trip:null,sheet:false,draft:null,done:{},lock:{},idx:{},portions:4,budget:150,units:'US',filt:'All',kept:{},passed:{}};
+const f=v=>'$'+v.toFixed(2),sum=o=>Object.values(o).reduce((a,b)=>a+b,0);
+const pill=(k,t)=>`<span class="pl" style="background:${SB[k]};color:${SC[k]}">${t||k}</span>`;
+const meals=[
+ {d:'Monday',o:[{n:'Sausage and pepper pasta',s:{Commissary:9.4},luke:'Plain pasta for Luke',sale:1},{n:'Chili mac',s:{Commissary:6.1,Lidl:4.1},luke:'Plain pasta for Luke'}]},
+ {d:'Tuesday',o:[{n:'Chicken taco bowls',s:{Lidl:6.3,Commissary:5.5}},{n:'Beef tacos',s:{Commissary:12.9},sale:1}]},
+ {d:'Wednesday',left:1},
+ {d:'Thursday',o:[{n:'Sheet-pan chicken and potatoes',s:{Aldi:8.6}},{n:'Pork chops and green beans',s:{Aldi:5.4,Lidl:4.5}}]},
+ {d:'Friday',o:[{n:'Oven fried chicken and corn',s:{Commissary:10.3},luke:'Luke eats this too'},{n:'Fried shrimp and fries',s:{Commissary:13.4},luke:'Luke eats this too'}]},
+ {d:'Saturday',o:[{n:'Schnitzel and spätzle',s:{Kaufland:11.2}},{n:'Homemade pizza',s:{Lidl:5.6,Commissary:4.2}}]},
+ {d:'Sunday',left:1}];
+const usuals=[['Chicken nuggets','2 bags',9.98],['Pasta','1 box',1.2],['Fried shrimp','1 bag',7.49]];
+const items=[
+ ['Pork sausage roll, 1 lb','Mon',{Commissary:2.83}],['Bell peppers, 3 pack','Mon',{Lidl:1.94,Aldi:2.05,Kaufland:2.15,Globus:2.26,REWE:2.69}],
+ ['Penne, 500 g','Mon',{Lidl:0.86,Aldi:0.86,Kaufland:0.95,Globus:0.97,REWE:1.18,Commissary:1.59}],['Chicken breast, 600 g','Tue',{Lidl:5.40,Aldi:5.50,Kaufland:5.62,Globus:5.80,REWE:6.47,Commissary:6.90}],
+ ['Black beans, 2 cans','Tue',{Commissary:1.78,Kaufland:2.14,REWE:2.56}],['Taco seasoning','Tue',{Commissary:0.89}],
+ ['Chicken thighs, 1 kg','Thu',{Aldi:6.15,Lidl:6.37,Kaufland:5.94,Globus:6.20,REWE:7.55}],['Potatoes, 2 kg','Thu',{Aldi:2.69,Lidl:2.69,Kaufland:2.80,Globus:2.58,REWE:3.23}],
+ ['Chicken drumsticks, 1.5 kg','Fri',{Commissary:7.20,Kaufland:7.45,Lidl:7.55}],['Corn on the cob, 4','Fri',{Commissary:3.10,Kaufland:2.80,REWE:3.75}],
+ ['Pork schnitzel, 600 g','Sat',{Kaufland:5.94,Globus:5.60,Lidl:6.15,Aldi:6.15,REWE:7.55}],['Spätzle, 500 g','Sat',{Kaufland:1.49,Lidl:1.18,Aldi:1.18,Globus:1.40,REWE:1.83}],
+ ['Chicken nuggets, 2 bags','Luke',{Commissary:9.98,Lidl:8.60,Kaufland:9.70}],['Fried shrimp','Luke',{Commissary:7.49}],['Pasta, 1 box','Luke',{Lidl:1.20,Aldi:1.20,Kaufland:1.30,Commissary:1.59}]];
+const box=[
+ {n:'Sausage and pepper pasta',t:30,c:9.4,tags:['Quick','Luke-friendly'],st:'Commissary',r:5},
+ {n:'Oven fried chicken and corn',t:45,c:10.3,tags:['Luke-friendly'],st:'Commissary',r:5},
+ {n:'Sheet-pan chicken and potatoes',t:40,c:8.6,tags:[],st:'Aldi',r:4},
+ {n:'Chicken taco bowls',t:25,c:11.8,tags:['Quick'],st:'Lidl',r:4},
+ {n:'Schnitzel and spätzle',t:35,c:11.2,tags:[],st:'Kaufland',r:5},
+ {n:'Beef and potato skillet',t:25,c:10.35,tags:['Quick'],st:'Commissary',r:3}];
+const sugg=[{n:'Sausage and sweet potato hash',t:30,c:9.30,sale:'Sausage on sale'},{n:'Creamy Tuscan chicken pasta',t:35,c:13.45,luke:'Plain pasta for Luke'},{n:'Honey garlic pork chops',t:30,c:9.17}];
+function pick(p,set){let b=null;for(const k in p){if(!set[k])continue;if(!b||p[k]<p[b])b=k}return b}
+function evalSet(set){let t=0,m=0;items.forEach(it=>{const s=pick(it[2],set);if(s)t+=it[2][s];else m++});return{t,m}}
+function bestSubset(sel,n){let best=null;const L=sel.length;for(let mask=1;mask<(1<<L);mask++){const ks=sel.filter((_,i)=>mask>>i&1);if(ks.length>n)continue;const set={};ks.forEach(k=>set[k]=1);const r=evalSet(set);if(!best||r.m<best.m||(r.m===best.m&&(r.t<best.t-0.001||(Math.abs(r.t-best.t)<0.001&&ks.length<best.n))))best={set,t:r.t,m:r.m,n:ks.length}}return best}
+const cur=()=>S.trip||S.def;
+function head(ey,t){return `<div class="hd"><div class="ey">${ey}</div><div class="sf" style="font-size:30px;line-height:1.2;margin-top:4px">${t}</div><div class="ln"></div></div>`}
+function planTotal(){let t=0;meals.forEach((m,i)=>{if(!m.left)t+=sum(m.o[S.idx[i]||0].s)});usuals.forEach(u=>t+=u[2]);return t}
+function vPlan(){
+ const t=planTotal();
+ let h=head('Week of November 2','Our table this week')+`<div class="cd" style="padding:14px 16px"><div class="row" style="align-items:flex-end"><div><div class="ey">Weekly total</div><div class="sf" style="font-size:32px;line-height:1.1">${f(t)}</div></div><div style="text-align:right"><div class="ey">Budget</div><div class="sf" style="font-size:20px">$${S.budget}</div></div></div><div style="height:5px;background:#EDE6DA;border-radius:3px;margin:12px 0 6px;overflow:hidden"><div style="height:5px;background:#8A9A74;width:${Math.min(100,t/S.budget*100).toFixed(0)}%"></div></div><div class="mu">${f(S.budget-t)} left this week</div></div>`;
+ h+=`<div class="row" style="margin:16px 2px 10px"><div class="sf" style="font-size:22px">Dinners</div><button class="ib" data-a="rebuild"><i class="ti ti-refresh" aria-hidden="true"></i> Rebuild unlocked</button></div>`;
+ h+=meals.map((m,i)=>{if(m.left)return `<div class="cd row" style="background:transparent;border-style:dashed"><div><div class="ey">${m.d}</div><div class="sf" style="font-size:18px;color:#857B6F">Leftovers night</div></div><button class="ib" data-a="find">Find a dinner</button></div>`;
+  const o=m.o[S.idx[i]||0],L=S.lock[i];
+  return `<div class="cd" style="${L?'border-color:#B9A88F':''}"><div class="row" style="align-items:flex-start"><div><div class="ey">${m.d}${L?' · locked':''}</div><div class="sf" style="font-size:19px;line-height:1.25;margin-top:2px">${o.n}</div></div><div class="sf" style="font-size:19px">${f(sum(o.s))}</div></div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${Object.keys(o.s).map(k=>pill(k)).join('')}${o.sale?'<span class="pl" style="background:#F5E9C9;color:#6E5527"><i class="ti ti-tag" aria-hidden="true"></i> On sale</span>':''}${o.luke?`<span class="pl" style="background:#EDE4EE;color:#5D4663"><i class="ti ti-heart" aria-hidden="true"></i> ${o.luke}</span>`:''}</div><div style="display:flex;gap:6px;margin-top:10px;justify-content:flex-end"><button class="ib ${L?'dk':''}" data-lock="${i}"><i class="ti ti-${L?'lock':'lock-open'}" aria-hidden="true"></i> ${L?'Locked':'Lock'}</button>${L?'':`<button class="ib" data-swap="${i}"><i class="ti ti-arrows-exchange" aria-hidden="true"></i> Swap</button>`}</div></div>`}).join('');
+ h+=`<div class="row" style="margin:16px 2px 10px"><div class="sf" style="font-size:22px">Luke's usuals</div><div class="mu">${f(usuals.reduce((a,u)=>a+u[2],0))}</div></div><div class="cd">${usuals.map((u,j)=>`<div class="row" style="padding:6px 0;${j?'border-top:1px solid #EFE8DC':''}"><div>${u[0]} <span class="mu">· ${u[1]}</span></div><span>${f(u[2])}</span></div>`).join('')}</div>`;
+ h+=`<button class="dk" data-a="tolist" style="width:100%;border-radius:999px;height:44px;font-family:inherit;margin-top:6px;cursor:pointer">Build shopping list</button>`;
+ return h}
+function vRecipes(){
+ let h=head('For Thursday and beyond','Recipes');
+ h+=`<div class="cd"><div class="sf" style="font-size:19px">Bring your own recipe</div><div style="display:flex;gap:6px;margin-top:8px"><input class="in" id="url" placeholder="allrecipes.com/recipe/…" aria-label="Recipe link"><button class="ib dk" data-a="imp">Import</button></div><div id="err" style="font-size:12px;color:#A3412E;margin:6px 4px 0"></div><label class="ib" style="display:flex;justify-content:center;gap:6px;margin-top:6px;padding:8px"><i class="ti ti-photo" aria-hidden="true"></i> Upload a screenshot<input type="file" accept="image/*" style="display:none" id="shot"></label><div id="impmsg" class="mu" style="margin-top:6px"></div></div>`;
+ h+=`<div class="row" style="margin:16px 2px 4px"><div class="sf" style="font-size:22px">Suggested this week</div></div><div class="mu" style="margin:0 2px 10px">Built around sales · ${S.portions} portions</div>`;
+ h+=sugg.map((r,i)=>S.passed[i]?'':`<div class="cd" style="${S.kept[i]?'border-color:#8A9A74':''}"><div class="row" style="align-items:flex-start"><div><div class="ey">${r.t} min</div><div class="sf" style="font-size:19px;line-height:1.25;margin-top:2px">${r.n}</div></div><div class="sf" style="font-size:19px">${f(r.c)}</div></div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${r.sale?`<span class="pl" style="background:#F5E9C9;color:#6E5527"><i class="ti ti-tag" aria-hidden="true"></i> ${r.sale}</span>`:''}${r.luke?`<span class="pl" style="background:#EDE4EE;color:#5D4663"><i class="ti ti-heart" aria-hidden="true"></i> ${r.luke}</span>`:''}</div><div style="display:flex;gap:6px;margin-top:10px;justify-content:flex-end">${S.kept[i]?'<span class="mu" style="color:#4F5E3E"><i class="ti ti-check" aria-hidden="true"></i> Saved to recipe box</span>':`<button class="ib" data-pass="${i}">Pass</button><button class="ib dk" data-keep="${i}">Keep</button>`}</div></div>`).join('');
+ h+=`<div class="row" style="margin:18px 2px 10px"><div class="sf" style="font-size:22px">Recipe box</div><span class="mu">${box.length} saved</span></div><div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${['All','Quick','Luke-friendly'].map(x=>`<button class="ib ${S.filt===x?'dk':''}" data-filt="${x}">${x}</button>`).join('')}</div>`;
+ h+=`<div class="cd" style="padding:4px 14px">${box.filter(r=>S.filt==='All'||r.tags.includes(S.filt)).map((r,j)=>`<div class="row" style="padding:10px 0;${j?'border-top:1px solid #EFE8DC':''}"><div><div class="sf" style="font-size:17px;line-height:1.25">${r.n}</div><div class="mu">${r.t} min · ${'★'.repeat(r.r)}${'☆'.repeat(5-r.r)}</div></div><div style="text-align:right"><div>${f(r.c)}</div>${pill(r.st)}</div></div>`).join('')}</div>`;
+ return h}
+function vList(){
+ const c=cur(),sel=ALL.filter(k=>c.on[k]);
+ const free=evalSet(c.on);let use=c.on,skipped=[];
+ if(c.max&&c.max<sel.length){const b=bestSubset(sel,c.max);use=b.set;skipped=sel.filter(k=>!use[k])}
+ const groups={},miss=[];let t=0;
+ items.forEach((it,i)=>{const s=pick(it[2],use);if(!s){miss.push(it);return}(groups[s]=groups[s]||[]).push([it,i,it[2][s]]);t+=it[2][s]});
+ let h=head('Week of November 2','Shopping list');
+ h+=`<button data-a="sheet" style="width:100%;display:flex;align-items:center;gap:8px;background:#FFFDF9;border:1px solid #E9E2D6;border-radius:999px;padding:8px 14px;font-family:inherit;font-size:12px;color:#5E564C;height:auto;cursor:pointer;text-align:left"><i class="ti ti-building-store" aria-hidden="true"></i><span style="flex:1">${sel.join(', ')} · ${c.max?'max '+c.max+' stop'+(c.max>1?'s':''):'no stop limit'}${S.trip?' · this trip':''}</span><i class="ti ti-adjustments-horizontal" aria-hidden="true"></i></button>`;
+ h+=`<div class="cd" style="margin-top:12px;padding:14px 16px"><div class="row" style="align-items:flex-end"><div><div class="ey">List total</div><div class="sf" style="font-size:32px;line-height:1.1">${f(t)}</div></div><div style="text-align:right"><div class="ey">Stops</div><div class="sf" style="font-size:20px">${Object.keys(groups).length}</div></div></div><div class="mu" style="margin-top:6px">${skipped.length?`Skipping ${skipped.join(' and ')} · ${t-free.t>0.005?f(t-free.t)+' more':'no extra cost'} than visiting every store`:'Cheapest price for every item at your stores'}</div></div>`;
+ h+=sel.filter(k=>groups[k]).map(k=>{const g=groups[k],left=g.filter(x=>!S.done[x[1]]).length;return `<div class="cd"><div class="row" style="margin-bottom:4px"><div class="row" style="gap:8px">${pill(k)}<span class="mu">${left} of ${g.length} left</span></div><span class="sf" style="font-size:19px">${f(g.reduce((a,x)=>a+x[2],0))}</span></div>${g.map(([it,i,p])=>{const d=S.done[i];return `<div class="it" data-done="${i}" role="checkbox" aria-checked="${d?'true':'false'}"><span class="bx" style="${d?'background:#8A9A74;border-color:#8A9A74;color:#FFFDF9':''}">${d?'<i class="ti ti-check" aria-hidden="true"></i>':''}</span><span style="flex:1;${d?'text-decoration:line-through;color:#A89E91':''}">${it[0]}<br><span class="mu">${it[1]==='Luke'?"Luke's usuals":it[1]}</span></span><span style="${d?'color:#A89E91':''}">${f(p)}</span></div>`}).join('')}</div>`}).join('');
+ if(miss.length)h+=`<div class="cd" style="background:transparent;border-style:dashed"><div class="ey" style="margin-bottom:6px">Not sold at these stops</div>${miss.map(it=>`<div class="row" style="padding:3px 0;font-size:13px"><span>${it[0]}</span><span class="mu">${Object.keys(it[2]).join(', ')}</span></div>`).join('')}</div>`;
+ return h}
+function vSet(){
+ const d=S.def;
+ let h=head('Household','Settings');
+ const r=(l,v)=>`<div class="row" style="padding:10px 0;border-top:1px solid #EFE8DC"><span>${l}</span>${v}</div>`;
+ h+=`<div class="cd" style="padding:4px 14px"><div class="ey" style="padding:10px 0 4px">Meals</div>${r('Portions per dinner',`<div class="row" style="gap:10px"><button class="ib" data-a="pm" aria-label="Fewer portions">−</button><span class="sf" style="font-size:19px">${S.portions}</span><button class="ib" data-a="pp" aria-label="More portions">+</button></div>`)}${r('Dinners per week','<span class="mu">5 + 2 leftovers</span>')}${r('Weeknight time limit','<span class="mu">45 min</span>')}</div>`;
+ h+=`<div class="cd" style="padding:4px 14px"><div class="ey" style="padding:10px 0 4px">Money</div>${r('Weekly budget',`<div class="row" style="gap:10px"><button class="ib" data-a="bm" aria-label="Lower budget">−</button><span class="sf" style="font-size:19px">$${S.budget}</span><button class="ib" data-a="bp" aria-label="Raise budget">+</button></div>`)}${r('Euro exchange rate','<span class="mu">€1 ≈ $1.08 · live</span>')}${r('Units',`<div class="sg">${['US','Metric'].map(u=>`<button class="${S.units===u?'a':''}" data-units="${u}">${u}</button>`).join('')}</div>`)}</div>`;
+ h+=`<div class="cd"><div class="ey" style="margin-bottom:8px">Default stores</div><div style="display:flex;flex-wrap:wrap;gap:6px">${ALL.map(k=>{const a=d.on[k];return `<button class="ch" data-defs="${k}" style="background:${a?SC[k]:'transparent'};color:${a?'#FFFDF9':SC[k]};border:1px solid ${a?SC[k]:'#DCD3C5'}"><i class="ti ti-${a?'check':'plus'}" aria-hidden="true"></i>${k}</button>`}).join('')}</div><div id="serr" style="font-size:12px;color:#A3412E;margin-top:6px"></div><div class="row" style="margin-top:10px"><span>Max stops</span><div class="sg">${['Off',1,2,3].map(v=>{const val=v==='Off'?0:v;return `<button class="${d.max===val?'a':''}" data-defm="${val}">${v}</button>`}).join('')}</div></div></div>`;
+ h+=`<div class="cd" style="padding:4px 14px"><div class="ey" style="padding:10px 0 4px">Family</div>${r("Luke's usuals",'<span class="mu">3 items <i class="ti ti-chevron-right" aria-hidden="true"></i></span>')}${r('Foods we skip','<span class="mu">2 items <i class="ti ti-chevron-right" aria-hidden="true"></i></span>')}${r('Share with Lydia','<span class="mu">Connected <i class="ti ti-chevron-right" aria-hidden="true"></i></span>')}</div>`;
+ return h}
+function vSheet(){
+ if(!S.sheet)return '';const d=S.draft,sel=ALL.filter(k=>d.on[k]);
+ return `<div style="position:absolute;inset:0;background:rgba(47,43,38,.35);display:flex;align-items:flex-end" data-a="closebg"><div style="background:#F7F3EC;width:100%;border-radius:22px 22px 0 0;padding:10px 18px 20px" data-stop="1"><div style="width:40px;height:4px;background:#DCD3C5;border-radius:2px;margin:0 auto 12px"></div><div class="row"><div class="sf" style="font-size:22px">Stores for this list</div><button class="ib" data-a="close" aria-label="Close" style="border:none"><i class="ti ti-x" aria-hidden="true"></i></button></div><div class="ey" style="margin:12px 0 8px">Stores we shop · ${sel.length} selected</div><div style="display:flex;flex-wrap:wrap;gap:6px">${ALL.map(k=>{const a=d.on[k];return `<button class="ch" data-ds="${k}" style="background:${a?SC[k]:'transparent'};color:${a?'#FFFDF9':SC[k]};border:1px solid ${a?SC[k]:'#DCD3C5'}"><i class="ti ti-${a?'check':'plus'}" aria-hidden="true"></i>${k}</button>`}).join('')}</div><div id="sherr" style="font-size:12px;color:#A3412E;margin-top:6px"></div><div class="row" style="margin-top:14px"><div><div>Max stops</div><div class="mu">${d.max?'Cheapest mix of up to '+d.max:'Off · cheapest store per item'}</div></div><div class="sg">${['Off',1,2,3].map(v=>{const val=v==='Off'?0:v;return `<button class="${d.max===val?'a':''}" data-dm="${val}">${v}</button>`}).join('')}</div></div><div style="display:flex;gap:8px;margin-top:18px"><button class="ib" data-a="trip" style="flex:1;padding:10px">Just this trip</button><button class="ib dk" data-a="savedef" style="flex:1;padding:10px">Save as default</button></div></div></div>`}
+function render(){
+ const v={plan:vPlan,recipes:vRecipes,list:vList,settings:vSet}[S.tab]();
+ document.getElementById('body').innerHTML=v;
+ document.getElementById('tabs').innerHTML=[['plan','calendar-week','Plan'],['recipes','book','Recipes'],['list','basket','List'],['settings','settings','Settings']].map(([k,i,l])=>`<button class="${S.tab===k?'a':''}" data-tab="${k}"><i class="ti ti-${i}" style="font-size:20px" aria-hidden="true"></i>${l}</button>`).join('');
+ document.getElementById('sheet').innerHTML=vSheet();
+ bind()}
+function q(sel,fn){document.querySelectorAll(sel).forEach(b=>b.onclick=e=>{e.stopPropagation();fn(b,e)})}
+function bind(){
+ q('[data-tab]',b=>{S.tab=b.dataset.tab;S.sheet=false;render()});
+ q('[data-lock]',b=>{const i=b.dataset.lock;S.lock[i]=!S.lock[i];render()});
+ q('[data-swap]',b=>{const i=+b.dataset.swap;S.idx[i]=((S.idx[i]||0)+1)%meals[i].o.length;render()});
+ q('[data-keep]',b=>{S.kept[b.dataset.keep]=1;render()});
+ q('[data-pass]',b=>{S.passed[b.dataset.pass]=1;render()});
+ q('[data-filt]',b=>{S.filt=b.dataset.filt;render()});
+ q('[data-done]',b=>{const i=b.dataset.done;S.done[i]=!S.done[i];render()});
+ q('[data-units]',b=>{S.units=b.dataset.units;render()});
+ q('[data-defs]',b=>{const k=b.dataset.defs;if(S.def.on[k]&&ALL.filter(x=>S.def.on[x]).length===1){document.getElementById('serr').textContent='Keep at least one store selected';return}S.def.on[k]=S.def.on[k]?0:1;render()});
+ q('[data-defm]',b=>{S.def.max=+b.dataset.defm;render()});
+ q('[data-ds]',b=>{const k=b.dataset.ds;if(S.draft.on[k]&&ALL.filter(x=>S.draft.on[x]).length===1){document.getElementById('sherr').textContent='Keep at least one store selected';return}S.draft.on[k]=S.draft.on[k]?0:1;render()});
+ q('[data-dm]',b=>{S.draft.max=+b.dataset.dm;render()});
+ q('[data-stop]',()=>{});
+ q('[data-a]',b=>{const a=b.dataset.a;
+  if(a==='rebuild')meals.forEach((m,i)=>{if(m.left||S.lock[i])return;let bi=0;m.o.forEach((o,j)=>{if(sum(o.s)<sum(m.o[bi].s))bi=j});S.idx[i]=bi});
+  if(a==='find'||a==='tolist')S.tab=a==='find'?'recipes':'list';
+  if(a==='sheet'){const c=cur();S.draft={on:{...c.on},max:c.max};S.sheet=true}
+  if(a==='close'||a==='closebg')S.sheet=false;
+  if(a==='trip'){S.trip={on:{...S.draft.on},max:S.draft.max};S.sheet=false}
+  if(a==='savedef'){S.def={on:{...S.draft.on},max:S.draft.max};S.trip=null;S.sheet=false}
+  if(a==='pm')S.portions=Math.max(1,S.portions-1);if(a==='pp')S.portions=Math.min(10,S.portions+1);
+  if(a==='bm')S.budget=Math.max(40,S.budget-10);if(a==='bp')S.budget+=10;
+  if(a==='imp'){const u=document.getElementById('url'),e=document.getElementById('err'),v=u.value.trim();if(!v){e.textContent='Paste a recipe link first';return}if(!/^(https?:\/\/)?[\w-]+(\.[\w-]+)+/.test(v)){e.textContent="That doesn't look like a link";return}box.unshift({n:'Slow cooker chicken pot pie soup',t:20,c:12.5,tags:['Quick'],st:'Lidl',r:4});S.filt='All'}
+  render()});
+ const u=document.getElementById('url');if(u)u.oninput=()=>{document.getElementById('err').textContent=''};
+ const sh=document.getElementById('shot');if(sh)sh.onchange=e=>{if(e.target.files[0]){box.unshift({n:'Sheet-pan gnocchi with sausage',t:30,c:8.15,tags:['Quick'],st:'Commissary',r:4});S.filt='All';render()}};
+}
+render();
+</script>
+
+</body></html>

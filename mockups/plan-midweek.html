@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Plan mid-week: move, skip, freshness check</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<style>
+:root{--surface-1:#ECE6DC;--font-sans:system-ui,-apple-system,"Segoe UI",sans-serif}
+body{margin:0;padding:24px 12px;background:#E9E3D9;font-family:var(--font-sans)}
+button{font-family:inherit}
+.note{max-width:380px;margin:0 auto 14px;font:13px/1.5 var(--font-sans);color:#6B6157}
+</style></head><body>
+<p class="note"><b>Plan mid-week: move, skip, freshness check</b> · Approved design reference. Prices, stores and recipes are sample data.</p>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Lato:wght@400&display=swap" rel="stylesheet">
+<style>
+.ph{max-width:380px;margin:0 auto;background:#F7F3EC;border:1px solid #E4DCCF;border-radius:28px;padding:22px 18px;font-family:Lato,var(--font-sans);font-size:14px;color:#2F2B26}
+.sf{font-family:'Cormorant Garamond',Georgia,serif;font-weight:500}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cd{background:#FFFDF9;border:1px solid #E9E2D6;border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.mu{color:#857B6F;font-size:12px}
+.ey{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#857B6F}
+.pl{font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.ib{background:transparent;border:1px solid #DCD3C5;border-radius:999px;color:#5E564C;font-size:12px;padding:5px 11px;height:auto;font-family:inherit;cursor:pointer}
+.dk{background:#2F2B26;border-color:#2F2B26;color:#F7F3EC}
+.mi{display:flex;width:100%;align-items:center;gap:10px;background:transparent;border:none;border-top:1px solid #EFE8DC;border-radius:0;padding:9px 2px;font-family:inherit;font-size:13px;color:#2F2B26;height:auto;cursor:pointer;text-align:left}
+</style>
+<div style="background:var(--surface-1);border-radius:12px;padding:1.25rem 0">
+<div class="ph" id="app"></div>
+</div>
+<script>
+const SB={Ramstein:'#E3E8D8',Vogelweh:'#E6E9D9',Globus:'#EAE3D3'},SC={Ramstein:'#4F5E3E',Vogelweh:'#55603C',Globus:'#5E5338'};
+const DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],TODAY=1;
+const M={
+ A:{n:'Sausage and pepper pasta',c:9.4,s:['Ramstein'],luke:'Plain pasta for Luke'},
+ B:{n:'Chicken taco bowls',c:11.8,s:['Ramstein','Globus'],fresh:'Chicken breast',by:2},
+ D:{n:'Sheet-pan chicken and potatoes',c:8.6,s:['Globus'],fresh:'Chicken thighs',by:4},
+ E:{n:'Oven fried chicken and corn',c:10.3,s:['Vogelweh'],luke:'Luke eats this too',frozen:1},
+ F:{n:'Schnitzel and spätzle',c:11.2,s:['Globus'],fresh:'Pork schnitzel',by:5}};
+let slot=['A','B','L','D','E','F','L'],cooked={0:1},menu=null,warn=null,next=[],toast='';
+const f=v=>'$'+v.toFixed(2),short=d=>DAYS[d].slice(0,3);
+function warnFor(id,d){const m=M[id];return m&&m.fresh&&d>m.by?`${m.fresh} for ${m.n.toLowerCase()} is best cooked by ${DAYS[m.by]}.`:null}
+function doMove(from,to){const a=slot[from];slot[from]=slot[to];slot[to]=a;toast=`Moved ${M[a].n.toLowerCase()} to ${DAYS[to]}`;menu=null;warn=null}
+function tryMove(from,to){const a=slot[from],b=slot[to],w=[warnFor(a,to),b!=='L'?warnFor(b,from):null].filter(Boolean);if(w.length){warn={from,to,msgs:w};menu=null}else doMove(from,to)}
+function card(d){
+ const id=slot[d],past=d<TODAY,isT=d===TODAY;
+ if(id==='L')return `<div class="cd row" style="background:transparent;border-style:dashed;${past?'opacity:.55':''}"><div><div class="ey">${DAYS[d]}</div><div class="sf" style="font-size:18px;color:#857B6F">Leftovers night</div></div><span class="mu">$0</span></div>`;
+ const m=M[id],done=cooked[d];
+ let h=`<div class="cd" style="${isT?'border-color:#B9A88F;':''}${past?'opacity:.6':''}"><div class="row" style="align-items:flex-start"><div><div class="ey">${DAYS[d]}${isT?' · tonight':''}${done?' · cooked':''}</div><div class="sf" style="font-size:19px;line-height:1.25;margin-top:2px">${m.n}</div></div><div class="row" style="gap:6px"><span class="sf" style="font-size:19px">${f(m.c)}</span>${past?'':`<button class="ib" data-menu="${d}" aria-label="Dinner options" style="border:none;padding:4px 6px"><i class="ti ti-dots" style="font-size:18px" aria-hidden="true"></i></button>`}</div></div>
+ <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${m.s.map(k=>`<span class="pl" style="background:${SB[k]};color:${SC[k]}">${k}</span>`).join('')}<span class="pl" style="background:#E8EEE0;color:#4F5E3E"><i class="ti ti-check" aria-hidden="true"></i> Bought</span>${m.fresh&&!past&&d<=m.by?`<span class="pl" style="background:#F3E8DD;color:#7A4632"><i class="ti ti-leaf" aria-hidden="true"></i> Cook by ${short(m.by)}</span>`:''}${m.frozen?'<span class="pl" style="background:#E3EAF0;color:#3F5566"><i class="ti ti-snowflake" aria-hidden="true"></i> Freezer</span>':''}${m.luke?`<span class="pl" style="background:#EDE4EE;color:#5D4663"><i class="ti ti-heart" aria-hidden="true"></i> ${m.luke}</span>`:''}</div>`;
+ if(menu===d){h+=`<div style="margin-top:10px"><div class="ey" style="padding:2px 2px 6px">Move to</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">${DAYS.map((_,j)=>j<TODAY||j===d?'':`<button class="ib" data-to="${j}">${short(j)}${slot[j]==='L'?' · leftovers':''}</button>`).join('')}</div>
+  ${isT?`<button class="mi" data-a="skip"><i class="ti ti-player-skip-forward" aria-hidden="true"></i><span style="flex:1">Skip tonight<br><span class="mu">Moves to next week · ingredients count as on hand</span></span></button>`:''}
+  <button class="mi" data-a="replace"><i class="ti ti-arrows-exchange" aria-hidden="true"></i><span style="flex:1">Replace with another dinner<br><span class="mu">Needs 3 new items · about $6.40</span></span></button>
+  <button class="mi" data-a="close"><i class="ti ti-x" aria-hidden="true"></i><span style="flex:1">Cancel</span></button></div>`}
+ if(warn&&warn.from===d){h+=`<div style="margin-top:10px;background:#F8EDE6;border:1px solid #E7CDBD;border-radius:12px;padding:12px"><div class="row" style="justify-content:flex-start;gap:8px;color:#7A4632;font-weight:500"><i class="ti ti-leaf" aria-hidden="true"></i> Freshness check</div>${warn.msgs.map(x=>`<div style="font-size:13px;margin-top:6px;color:#5E3A2A">${x}</div>`).join('')}<div class="mu" style="margin-top:6px">Moving to ${DAYS[warn.to]} may mean using it a day or two late, or freezing it tonight.</div><div style="display:flex;gap:8px;margin-top:10px"><button class="ib" data-a="cancelwarn" style="flex:1;padding:8px">Keep it</button><button class="ib dk" data-a="force" style="flex:1;padding:8px">Move anyway</button></div></div>`}
+ return h+'</div>'}
+function render(){
+ const tid=slot[TODAY],tm=M[tid];
+ let h=`<div style="text-align:center"><div class="ey">Week of November 2 · shopping done</div><div class="sf" style="font-size:30px;line-height:1.2;margin-top:4px">Our table this week</div><div style="width:36px;border-top:1px solid #B9A88F;margin:10px auto 0"></div></div>`;
+ h+=tm?`<div class="cd row" style="margin-top:16px;background:#2F2B26;border-color:#2F2B26;color:#F7F3EC"><div><div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#CFC5B6">Tonight</div><div class="sf" style="font-size:20px;margin-top:2px">${tm.n}</div></div><button class="ib" style="border-color:#F7F3EC;color:#F7F3EC"><i class="ti ti-chef-hat" aria-hidden="true"></i> Cook</button></div>`:`<div class="cd" style="margin-top:16px;text-align:center"><div class="ey">Tonight</div><div class="sf" style="font-size:20px;color:#857B6F">Leftovers night</div></div>`;
+ h+=`<div class="row" style="margin:12px 2px 10px"><div class="sf" style="font-size:22px">Dinners</div><span class="mu">Spent ${f(Object.values(M).reduce((a,m)=>a+m.c,0)+18.67)} of $150</span></div>`;
+ h+=toast?`<div class="row" style="background:#E8EEE0;color:#4F5E3E;border-radius:999px;padding:7px 14px;margin-bottom:10px;font-size:12.5px"><span><i class="ti ti-check" aria-hidden="true"></i> ${toast}</span><button class="ib" data-a="untoast" aria-label="Dismiss" style="border:none;color:#4F5E3E;padding:0 4px"><i class="ti ti-x" aria-hidden="true"></i></button></div>`:'';
+ h+=DAYS.map((_,d)=>card(d)).join('');
+ if(next.length)h+=`<div class="cd" style="background:transparent;border-style:dashed"><div class="ey">Carried to next week</div>${next.map(id=>`<div class="row" style="padding:6px 0"><span class="sf" style="font-size:17px">${M[id].n}</span><span class="mu">on hand</span></div>`).join('')}</div>`;
+ document.getElementById('app').innerHTML=h;
+ document.querySelectorAll('[data-menu]').forEach(b=>b.onclick=()=>{const d=+b.dataset.menu;menu=menu===d?null:d;warn=null;render()});
+ document.querySelectorAll('[data-to]').forEach(b=>b.onclick=()=>{tryMove(menu,+b.dataset.to);render()});
+ document.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;
+  if(a==='close'){menu=null}
+  if(a==='cancelwarn'){warn=null}
+  if(a==='force'){doMove(warn.from,warn.to)}
+  if(a==='untoast'){toast=''}
+  if(a==='replace'){toast='Replace opens suggestions, priced for the extra items';menu=null}
+  if(a==='skip'){const id=slot[TODAY];next.push(id);slot[TODAY]='L';toast=`Skipped tonight · ${M[id].n.toLowerCase()} moved to next week`;menu=null}
+  render()});
+}
+render();
+</script>
+
+</body></html>

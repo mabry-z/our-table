@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Recipe page and cook mode</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<style>
+:root{--surface-1:#ECE6DC;--font-sans:system-ui,-apple-system,"Segoe UI",sans-serif}
+body{margin:0;padding:24px 12px;background:#E9E3D9;font-family:var(--font-sans)}
+button{font-family:inherit}
+.note{max-width:380px;margin:0 auto 14px;font:13px/1.5 var(--font-sans);color:#6B6157}
+</style></head><body>
+<p class="note"><b>Recipe page and cook mode</b> · Approved design reference. Prices, stores and recipes are sample data.</p>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Lato:wght@400&display=swap" rel="stylesheet">
+<style>
+.ph{max-width:380px;margin:0 auto;background:#F7F3EC;border:1px solid #E4DCCF;border-radius:28px;font-family:Lato,var(--font-sans);font-size:14px;color:#2F2B26;overflow:hidden}
+.bd{padding:20px 18px 20px;min-height:660px;display:flex;flex-direction:column}
+.sf{font-family:'Cormorant Garamond',Georgia,serif;font-weight:500}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cd{background:#FFFDF9;border:1px solid #E9E2D6;border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.mu{color:#857B6F;font-size:12px}
+.ey{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#857B6F}
+.pl{font-size:11px;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.ib{background:transparent;border:1px solid #DCD3C5;border-radius:999px;color:#5E564C;font-size:12px;padding:5px 11px;height:auto;font-family:inherit;cursor:pointer}
+.dk{background:#2F2B26;border-color:#2F2B26;color:#F7F3EC}
+.big{width:100%;border-radius:999px;height:46px;font-family:inherit;font-size:14px;letter-spacing:.04em;cursor:pointer}
+</style>
+<div style="background:var(--surface-1);border-radius:12px;padding:1.25rem 0">
+<div class="ph"><div class="bd" id="body"></div></div>
+</div>
+<script>
+const SB={Commissary:'#E3E8D8',Lidl:'#DFE6EC',Aldi:'#F1E7D2',Pantry:'#EDE6DA'},SC={Commissary:'#4F5E3E',Lidl:'#3F5566',Aldi:'#6E5527',Pantry:'#6B6157'};
+const ING={saus:['Pork sausage',1,'lb','Commissary'],pep:['Bell peppers, sliced',3,'','Lidl'],oni:['Onion, sliced',1,'','Lidl'],pen:['Penne',500,'g','Lidl'],tom:['Crushed tomatoes',400,'g can','Aldi'],gar:['Garlic, minced',2,'cloves','Pantry'],par:['Parmesan, grated',40,'g','Commissary']};
+const STEPS=[
+ {t:'Boil the water',x:'Bring a large pot of well-salted water to a boil.',i:[]},
+ {t:'Brown the sausage',x:'Crumble the sausage into a large skillet over medium-high heat. Cook until browned, breaking it up as it goes.',i:['saus'],tm:360},
+ {t:'Soften the vegetables',x:'Add the peppers and onion to the skillet. Cook, stirring now and then, until soft.',i:['pep','oni'],tm:300},
+ {t:'Cook the pasta',x:'Add the penne to the boiling water and cook until just tender.',i:['pen'],tm:660},
+ {t:"Set aside Luke's portion",x:'Drain the pasta. Before anything else touches it, scoop one plain portion into a bowl for Luke.',i:[],luke:1},
+ {t:'Bring it together',x:'Stir the garlic and crushed tomatoes into the skillet and simmer. Toss with the pasta and top with parmesan.',i:['gar','tom','par'],tm:300}];
+const S={v:'recipe',p:4,step:0,timers:{},rate:null,got:{}};
+let tick=null;
+const amt=k=>{const [n,a,u]=ING[k];let v=a*S.p/4;v=u==='g'?Math.round(v/5)*5:u==='lb'?Math.round(v*4)/4:Math.max(1,Math.round(v*2)/2);return (u==='g can'?`${v} g can`:`${v}${u&&u!=='g can'?(u==='g'?' g':' '+u):''}`)};
+const mmss=s=>`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+function recipe(){
+ const cost=9.40*S.p/4;
+ return `<div class="row"><button class="ib" data-a="back" aria-label="Back to plan" style="border:none;padding-left:0"><i class="ti ti-arrow-left" style="font-size:18px" aria-hidden="true"></i></button><span class="ey">Monday · tonight</span><i class="ti ti-heart" style="font-size:18px;color:#857B6F" aria-hidden="true"></i></div>
+ <div style="height:150px;border-radius:16px;margin:12px 0 14px;background:#EDE6DA;display:flex;align-items:center;justify-content:center;color:#B9A88F"><i class="ti ti-tools-kitchen-2" style="font-size:40px" aria-hidden="true"></i></div>
+ <div class="sf" style="font-size:30px;line-height:1.15">Sausage and pepper pasta</div>
+ <div style="display:flex;gap:14px;margin:10px 0 4px" class="mu"><span><i class="ti ti-clock" aria-hidden="true"></i> 30 min</span><span><i class="ti ti-receipt" aria-hidden="true"></i> $${cost.toFixed(2)}</span><span>★★★★★</span></div>
+ <div style="margin:8px 0 14px"><span class="pl" style="background:#EDE4EE;color:#5D4663"><i class="ti ti-heart" aria-hidden="true"></i> Plain pasta for Luke</span></div>
+ <div class="row" style="margin:4px 2px 8px"><div class="sf" style="font-size:22px">Ingredients</div><div class="row" style="gap:8px"><button class="ib" data-a="pm" aria-label="Fewer portions">−</button><span style="font-size:13px">${S.p} portions</span><button class="ib" data-a="pp" aria-label="More portions">+</button></div></div>
+ <div class="cd" style="padding:4px 14px">${Object.keys(ING).map((k,j)=>{const g=S.got[k];return `<div class="row" data-g="${k}" style="padding:8px 0;cursor:pointer;${j?'border-top:1px solid #EFE8DC':''}"><div class="row" style="gap:10px;justify-content:flex-start"><span style="width:18px;height:18px;border:1px solid #B9A88F;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:13px;${g?'background:#8A9A74;border-color:#8A9A74;color:#FFFDF9':''}">${g?'<i class="ti ti-check" aria-hidden="true"></i>':''}</span><span style="${g?'color:#A89E91;text-decoration:line-through':''}"><span style="font-weight:500">${amt(k)}</span> ${ING[k][0].toLowerCase()}</span></div><span class="pl" style="background:${SB[ING[k][3]]};color:${SC[ING[k][3]]}">${ING[k][3]}</span></div>`}).join('')}</div>
+ <div class="mu" style="margin:0 2px 14px">Tap to check off as you gather</div>
+ <div class="sf" style="font-size:22px;margin:0 2px 8px">Steps</div>
+ <div class="cd" style="padding:4px 14px">${STEPS.map((s,j)=>`<div style="display:flex;gap:12px;padding:9px 0;${j?'border-top:1px solid #EFE8DC':''}"><span class="sf" style="font-size:18px;color:#B9A88F;width:14px">${j+1}</span><div><div style="font-weight:500">${s.t}${s.luke?' <i class="ti ti-heart" style="color:#5D4663" aria-hidden="true"></i>':''}</div><div class="mu" style="font-size:12.5px;line-height:1.5">${s.x}</div></div></div>`).join('')}</div>
+ <div style="flex:1"></div>
+ <button class="big dk" data-a="cook" style="border:none;margin-top:8px"><i class="ti ti-chef-hat" aria-hidden="true"></i> Start cooking</button>`}
+function cook(){
+ const s=STEPS[S.step],n=STEPS.length,tm=S.timers[S.step];
+ const remaining=tm?tm.left:s.tm;
+ return `<div class="row"><button class="ib" data-a="exit" style="border:none;padding-left:0"><i class="ti ti-x" style="font-size:18px" aria-hidden="true"></i></button><span class="ey">Step ${S.step+1} of ${n}</span><span class="mu"><i class="ti ti-sun" aria-hidden="true"></i> Screen on</span></div>
+ <div style="display:flex;gap:4px;margin:12px 0 22px">${STEPS.map((_,j)=>`<div style="flex:1;height:4px;border-radius:2px;background:${j<=S.step?'#8A9A74':'#E4DCCF'}"></div>`).join('')}</div>
+ ${s.luke?`<div class="cd" style="background:#EDE4EE;border-color:#DCCBE0;color:#5D4663;display:flex;gap:10px;align-items:center"><i class="ti ti-heart" style="font-size:20px" aria-hidden="true"></i><div><div style="font-weight:500">For Luke</div><div style="font-size:12.5px">Plain pasta, nothing on it</div></div></div>`:''}
+ <div class="sf" style="font-size:32px;line-height:1.15;margin-top:6px">${s.t}</div>
+ <div style="font-size:19px;line-height:1.55;margin:14px 0 18px">${s.x}</div>
+ ${s.i.length?`<div class="ey" style="margin-bottom:8px">For this step</div><div class="cd" style="padding:4px 14px">${s.i.map((k,j)=>`<div class="row" style="padding:8px 0;${j?'border-top:1px solid #EFE8DC':''}"><span><span style="font-weight:500">${amt(k)}</span> ${ING[k][0].toLowerCase()}</span></div>`).join('')}</div>`:''}
+ ${s.tm?`<div class="cd row" style="padding:14px 16px;margin-top:6px;${tm&&tm.left===0?'border-color:#C88E6E;background:#F8EDE6':''}"><div><div class="ey">${tm&&tm.left===0?'Time is up':'Timer'}</div><div class="sf" style="font-size:34px;line-height:1.1" id="tdisp">${mmss(remaining)}</div></div><button class="ib ${tm&&tm.run?'':'dk'}" data-a="timer" style="padding:8px 16px">${tm?(tm.left===0?'Reset':tm.run?'Pause':'Resume'):'Start timer'}</button></div>`:''}
+ <div style="flex:1"></div>
+ <div style="display:flex;gap:8px;margin-top:14px"><button class="ib" data-a="prev" style="flex:1;height:46px;font-size:14px" ${S.step===0?'aria-disabled="true"':''}><i class="ti ti-arrow-left" aria-hidden="true"></i> Back</button><button class="ib dk" data-a="next" style="flex:2;height:46px;font-size:14px">${S.step===n-1?'Finish':'Next step'} <i class="ti ti-arrow-right" aria-hidden="true"></i></button></div>`}
+function done(){
+ return `<div style="flex:1;display:flex;flex-direction:column;justify-content:center;text-align:center">
+ <i class="ti ti-tools-kitchen-2" style="font-size:36px;color:#B9A88F" aria-hidden="true"></i>
+ <div class="sf" style="font-size:32px;margin-top:10px">Dinner is served</div>
+ <div class="mu" style="font-size:13px;margin:6px 0 24px">How did it go over?</div>
+ <div style="display:flex;gap:10px;justify-content:center">${[['up','thumb-up','Make again'],['down','thumb-down','Not for us']].map(([k,i,l])=>`<button class="ib ${S.rate===k?'dk':''}" data-r="${k}" style="padding:12px 18px;font-size:13px"><i class="ti ti-${i}" aria-hidden="true"></i> ${l}</button>`).join('')}</div>
+ <div class="mu" style="margin-top:14px;min-height:16px">${S.rate==='up'?'Saved. It will come up again in future plans.':S.rate==='down'?"Got it. We'll suggest it less often.":''}</div>
+ <div class="cd" style="margin-top:22px;text-align:left"><div class="ey">Leftovers</div><div style="margin-top:4px">About 1 portion left · Wednesday is leftovers night</div></div>
+ </div><button class="big dk" data-a="exit" style="border:none">Back to the week</button>`}
+function render(){
+ document.getElementById('body').innerHTML=S.v==='recipe'?recipe():S.v==='cook'?cook():done();
+ document.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>act(b.dataset.a));
+ document.querySelectorAll('[data-g]').forEach(r=>r.onclick=()=>{S.got[r.dataset.g]=!S.got[r.dataset.g];render()});
+ document.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{S.rate=b.dataset.r;render()});
+}
+function act(a){
+ if(a==='pm')S.p=Math.max(1,S.p-1);
+ if(a==='pp')S.p=Math.min(8,S.p+1);
+ if(a==='cook'){S.v='cook';S.step=0}
+ if(a==='exit'||a==='back'){S.v='recipe';S.rate=null}
+ if(a==='prev'&&S.step>0)S.step--;
+ if(a==='next'){if(S.step<STEPS.length-1)S.step++;else S.v='done'}
+ if(a==='timer'){const k=S.step,s=STEPS[k];let t=S.timers[k];if(!t)S.timers[k]={left:s.tm,run:true};else if(t.left===0)delete S.timers[k];else t.run=!t.run;startTick()}
+ render();
+}
+function startTick(){if(tick)return;tick=setInterval(()=>{let any=false,changed=false;for(const k in S.timers){const t=S.timers[k];if(t.run&&t.left>0){t.left--;any=true;if(t.left===0){t.run=false;changed=true}}}
+ if(S.v==='cook'){const d=document.getElementById('tdisp'),t=S.timers[S.step];if(changed)render();else if(d&&t)d.textContent=mmss(t.left)}
+ if(!any){clearInterval(tick);tick=null}},1000)}
+render();
+</script>
+
+</body></html>
