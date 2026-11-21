@@ -5,8 +5,7 @@ import { sampleRows } from './sample-data.js';
 
 export const mode = SUPABASE_URL && SUPABASE_ANON_KEY ? 'supabase' : 'sample';
 
-const TABLES = ['households', 'members', 'stores', 'products', 'ingredients', 'ingredient_matches',
-  'recipes', 'plans', 'plan_meals', 'usuals', 'list_items'];
+const TABLES = ['households', 'members', 'ingredients', 'recipes', 'plans', 'plan_meals', 'usuals', 'list_items'];
 let sb = null;
 let rows = null;
 
@@ -39,17 +38,13 @@ export async function signOut() {
 export async function loadRows() {
   if (mode === 'sample') return (rows = sampleRows());
   const c = await client();
-  const get = async (name, build = q => q) => {
-    const { data, error } = await build(c.from(name).select('*'));
+  const get = async name => {
+    const { data, error } = await c.from(name).select('*');
     if (error) throw error;
     return data;
   };
   const out = {};
-  await Promise.all([
-    ...TABLES.map(async t => { out[t] = await get(t); }),
-    (async () => { out.prices = await get('latest_prices'); })(),
-    (async () => { out.exchange_rates = await get('exchange_rates', q => q.order('rate_date', { ascending: false }).limit(1)); })(),
-  ]);
+  await Promise.all(TABLES.map(async t => { out[t] = await get(t); }));
   return (rows = out);
 }
 

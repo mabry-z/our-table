@@ -1,4 +1,4 @@
-import { f, esc, icon, pill, salePill, lukePill, head, stars } from '../ui.js';
+import { esc, icon, lukePill, head, stars } from '../ui.js';
 
 export function vRecipes(S, M) {
   let h = head('For Thursday and beyond', 'Recipes');
@@ -10,13 +10,12 @@ export function vRecipes(S, M) {
 
   const sugg = M.recipes.filter(r => r.status === 'suggested' || S.kept[r.id]);
   h += `<div class="row" style="margin:16px 2px 4px"><div class="sf dsp" style="font-size:22px">Suggested this week</div></div>`
-    + `<div class="mu" style="margin:0 2px 10px">Built around sales · ${M.hh.portions} portions</div>`;
+    + `<div class="mu" style="margin:0 2px 10px">Ideas for this week · ${M.hh.portions} portions</div>`;
   h += sugg.length ? sugg.map(r => {
     const kept = S.kept[r.id];
-    return `<div class="cd"${kept ? ' style="border-color:#8A9A74"' : ''}><div class="row" style="align-items:flex-start">`
+    return `<div class="cd"${kept ? ' style="border-color:#8A9A74"' : ''}>`
       + `<div><div class="ey">${r.time_min} min</div><div class="sf" style="font-size:18px;line-height:1.25;margin-top:2px">${esc(r.title)}</div></div>`
-      + `<div class="sf" style="font-size:18px">${f(r.cost)}</div></div>`
-      + `<div class="pills">${r.sale_note ? salePill(r.sale_note) : ''}${r.luke_note ? lukePill(r.luke_note) : ''}</div>`
+      + (r.luke_note ? `<div class="pills">${lukePill(r.luke_note)}</div>` : '')
       + `<div class="acts">${kept ? `<span class="mu" style="color:#4F5E3E">${icon('check')} Saved to recipe box</span>`
         : `<button class="ib" data-pass="${r.id}">Pass</button><button class="ib dk" data-keep="${r.id}">Keep</button>`}</div></div>`;
   }).join('') : `<div class="cd ghost mu">No suggestions right now.</div>`;
@@ -26,9 +25,8 @@ export function vRecipes(S, M) {
   h += `<div class="row" style="margin:18px 2px 10px"><div class="sf dsp" style="font-size:22px">Recipe box</div><span class="mu">${box.length} saved</span></div>`
     + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${['All', 'Quick', 'Luke-friendly'].map(x => `<button class="ib ${S.filt === x ? 'dk' : ''}" data-filt="${x}">${x}</button>`).join('')}</div>`;
   h += `<div class="cd" style="padding:4px 14px">` + (shown.length ? shown.map((r, j) =>
-    `<div class="row" style="padding:10px 0;${j ? 'border-top:1px solid #EFE8DC' : ''}"><div><div class="sf" style="font-size:16px;line-height:1.25">${esc(r.title)}</div>`
-    + `<div class="mu">${r.time_min} min · ${stars(r.rating)}</div></div>`
-    + `<div style="text-align:right"><div>${f(r.cost)}</div>${r.mainChain ? pill(r.mainChain) : ''}</div></div>`).join('')
+    `<div style="padding:10px 0;${j ? 'border-top:1px solid var(--rule2)' : ''}"><div class="sf" style="font-size:16px;line-height:1.25">${esc(r.title)}</div>`
+    + `<div class="mu">${r.time_min} min · ${stars(r.rating)}</div></div>`).join('')
     : `<div class="mu" style="padding:10px 0">Nothing here yet.</div>`) + `</div>`;
   return h;
 }
