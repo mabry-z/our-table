@@ -47,6 +47,19 @@ const ITEMS = [
   ['pasta', 'Pasta', 'Pasta, 1 box', 'Luke', { Lidl: 1.20, Aldi: 1.20, Kaufland: 1.30, Commissary: 1.59 }],
 ];
 
+// Aisle for each ingredient above, so the list can group the way we walk the store.
+const AISLES = {
+  pork_sausage: 'meat', bell_peppers: 'produce', penne: 'pantry', chicken_breast: 'meat', black_beans: 'pantry',
+  taco_seasoning: 'pantry', chicken_thighs: 'meat', potatoes: 'produce', drumsticks: 'meat', corn: 'produce',
+  pork_schnitzel: 'meat', spaetzle: 'pantry', nuggets: 'frozen', fried_shrimp: 'frozen', pasta: 'pantry',
+};
+
+// This week's picks, as in mockups/ask-bar.html: key, title, minutes, origin, link
+const PICKS = [
+  ['gnocchi', 'Sheet-pan gnocchi with sausage', 35, 'link', 'https://www.budgetbytes.com/sheet-pan-gnocchi-with-sausage/'],
+  ['dumplings', "Grandma's chicken and dumplings", 60, 'photo', null],
+];
+
 // key, title, minutes, tags, rating, status, cached cost by chain, Luke note, sale note
 const RECIPES = [
   ['sausage_pasta', 'Sausage and pepper pasta', 30, ['Quick', 'Luke-friendly'], 5, 'box', { Commissary: 9.4 }, 'Plain pasta for Luke', 'On sale'],
@@ -105,9 +118,11 @@ export function sampleRows() {
       time_limit_min: 45, weekly_budget: 150, units: 'US', home_currency: 'USD',
       default_store_ids: DEFAULT_STORES.map(k => uid('store:' + k)), max_stops: 0,
       foods_we_skip: ['Mushrooms', 'Olives'],
+      ai_suggestions: true, ai_monthly_limit: 10,
+      recipe_sites: ['allrecipes.com', 'budgetbytes.com', 'seriouseats.com', 'simplyrecipes.com', 'bbcgoodfood.com', 'kingarthurbaking.com'],
     }],
     members: [], stores: [], ingredients: [], products: [], prices: [], ingredient_matches: [],
-    recipes: [], plans: [], plan_meals: [], usuals: [], list_items: [],
+    recipes: [], picks: [], plans: [], plan_meals: [], usuals: [], list_items: [],
     exchange_rates: [{ rate_date: '2026-10-26', base: 'EUR', quote: 'USD', rate: RATE, source: 'sample' }],
   };
 
@@ -117,7 +132,7 @@ export function sampleRows() {
 
   ITEMS.forEach(([k, ing, label, , byChain, overrides = {}]) => {
     const ingId = uid('ing:' + k);
-    R.ingredients.push({ id: ingId, household_id: hh, name: ing, default_unit: null, pantry_staple: false });
+    R.ingredients.push({ id: ingId, household_id: hh, name: ing, default_unit: null, pantry_staple: false, aisle: AISLES[k] || 'other' });
     for (const [store, , chain, currency] of STORES) {
       if (!(chain in byChain)) continue;
       let [usd, sale] = Array.isArray(byChain[chain]) ? byChain[chain] : [byChain[chain], null];
@@ -136,9 +151,21 @@ export function sampleRows() {
   RECIPES.forEach(([k, title, time_min, tags, rating, status, cost_by_store, luke_note, sale_note], i) => R.recipes.push({
     id: uid('recipe:' + k), household_id: hh, title, source_url: null, servings: 4, time_min, tags, rating,
     steps: k === 'sausage_pasta' ? SAUSAGE_PASTA_STEPS : [], status, luke_note, sale_note, cost_by_store,
+    origin: 'manual', site: null, photo_path: null, cuisine: null, protein: null, notes: null,
     // newest first in the recipe box, in mockup order
     created_at: new Date(Date.parse('2026-10-26T12:00:00Z') - i * 60000).toISOString(),
   }));
+
+  PICKS.forEach(([k, title, time_min, origin, url], i) => {
+    const id = uid('recipe:' + k);
+    R.recipes.push({
+      id, household_id: hh, title, source_url: url, servings: 4, time_min, tags: [], rating: null,
+      steps: [], status: 'box', luke_note: null, sale_note: null, cost_by_store: {},
+      origin, site: url ? new URL(url).hostname.replace(/^www\./, '') : null, photo_path: null, cuisine: null, protein: null, notes: null,
+      created_at: new Date(Date.parse('2026-11-17T12:00:00Z') + i * 86400000).toISOString(),
+    });
+    R.picks.push({ id: uid('pick:' + k), household_id: hh, recipe_id: id, added_by: null, added_at: new Date(Date.parse('2026-11-17T12:00:00Z') + i * 86400000).toISOString() });
+  });
 
   WEEKS.forEach(([week, withList, nights]) => {
     const planId = uid('plan:' + week);
@@ -151,6 +178,7 @@ export function sampleRows() {
     if (withList) ITEMS.forEach(([k, , label, forLabel], i) => R.list_items.push({
       id: uid(`item:${week}:${k}`), household_id: hh, plan_id: planId, ingredient_id: uid('ing:' + k), label,
       for_label: forLabel, product_id: null, store_id: null, quantity: 1, checked: false, position: i,
+      aisle: null, quantity_label: null, have_it: false, custom: false,
     }));
   });
 

@@ -2,8 +2,8 @@
 -- edit that file and regenerate rather than editing this one.
 begin;
 
-insert into public.households (id, name, portions, dinners_per_week, leftovers_per_week, time_limit_min, weekly_budget, units, home_currency, default_store_ids, max_stops, foods_we_skip) values
-  ('4e305711-6464-4621-a4a2-138d007a26f5', 'Our household', 4, 5, 2, 45, 150, 'US', 'USD', array['5592975e-4118-4c20-a023-1fc66244ba64', 'da57bba0-2437-47d2-a5ac-069827b09376', 'cd336ee0-0221-4872-af80-bd4053aa90fe', '57c0ec09-6725-45cf-ac3b-fcc5e63c34cf', 'b008b341-2fe8-4e2f-a1ab-41c1c7c88063', 'c875c6dd-b0b0-4443-a095-74e15c5c5f0b']::uuid[], 0, array['Mushrooms', 'Olives']::text[]);
+insert into public.households (id, name, portions, dinners_per_week, leftovers_per_week, time_limit_min, weekly_budget, units, home_currency, default_store_ids, max_stops, foods_we_skip, ai_suggestions, ai_monthly_limit, recipe_sites) values
+  ('4e305711-6464-4621-a4a2-138d007a26f5', 'Our household', 4, 5, 2, 45, 150, 'US', 'USD', array['5592975e-4118-4c20-a023-1fc66244ba64', 'da57bba0-2437-47d2-a5ac-069827b09376', 'cd336ee0-0221-4872-af80-bd4053aa90fe', '57c0ec09-6725-45cf-ac3b-fcc5e63c34cf', 'b008b341-2fe8-4e2f-a1ab-41c1c7c88063', 'c875c6dd-b0b0-4443-a095-74e15c5c5f0b']::uuid[], 0, array['Mushrooms', 'Olives']::text[], true, 10, array['allrecipes.com', 'budgetbytes.com', 'seriouseats.com', 'simplyrecipes.com', 'bbcgoodfood.com', 'kingarthurbaking.com']::text[]);
 
 insert into public.stores (id, household_id, name, chain, currency, external_id, sort_order) values
   ('5592975e-4118-4c20-a023-1fc66244ba64', '4e305711-6464-4621-a4a2-138d007a26f5', 'Ramstein', 'Commissary', 'USD', '5873', 0),
@@ -14,22 +14,22 @@ insert into public.stores (id, household_id, name, chain, currency, external_id,
   ('c875c6dd-b0b0-4443-a095-74e15c5c5f0b', '4e305711-6464-4621-a4a2-138d007a26f5', 'Globus', 'Globus', 'EUR', null, 5),
   ('12d94b82-7bf3-4d68-a7bf-db3e5a2a6bc0', '4e305711-6464-4621-a4a2-138d007a26f5', 'REWE', 'REWE', 'EUR', null, 6);
 
-insert into public.ingredients (id, household_id, name, default_unit, pantry_staple) values
-  ('0ca40c5a-5423-438c-a12a-03ce6bfc65ec', '4e305711-6464-4621-a4a2-138d007a26f5', 'Pork sausage', null, false),
-  ('584b7427-e1e2-4241-a5f2-4d3b8da808a9', '4e305711-6464-4621-a4a2-138d007a26f5', 'Bell peppers', null, false),
-  ('ec52ed2c-ef4d-4cc4-a699-398c22691cbc', '4e305711-6464-4621-a4a2-138d007a26f5', 'Penne', null, false),
-  ('3dfeb04d-6c5e-49c3-adf0-d7c5a520a977', '4e305711-6464-4621-a4a2-138d007a26f5', 'Chicken breast', null, false),
-  ('5840fbfd-eb5a-4bad-a201-9355909a571d', '4e305711-6464-4621-a4a2-138d007a26f5', 'Black beans', null, false),
-  ('63f86ea9-431c-43b7-a165-58e579f76377', '4e305711-6464-4621-a4a2-138d007a26f5', 'Taco seasoning', null, false),
-  ('d49c0139-9c59-469f-a860-6a5db755d247', '4e305711-6464-4621-a4a2-138d007a26f5', 'Chicken thighs', null, false),
-  ('37de36b7-165a-4e65-ae04-0ab71a5fffb1', '4e305711-6464-4621-a4a2-138d007a26f5', 'Potatoes', null, false),
-  ('fdb9e7fd-ce66-4787-a1ea-e4f1d9533f1f', '4e305711-6464-4621-a4a2-138d007a26f5', 'Chicken drumsticks', null, false),
-  ('09b0d85a-3e88-4d3c-ae43-64a2bcc32100', '4e305711-6464-4621-a4a2-138d007a26f5', 'Corn on the cob', null, false),
-  ('e1b6bd35-3075-40a7-ac58-0b8deed8390b', '4e305711-6464-4621-a4a2-138d007a26f5', 'Pork schnitzel', null, false),
-  ('51232348-2a2c-4082-ac9a-24e4cce5e98a', '4e305711-6464-4621-a4a2-138d007a26f5', 'Spätzle', null, false),
-  ('d4e147d1-e9ee-4ab5-a822-2c853ad9bdc9', '4e305711-6464-4621-a4a2-138d007a26f5', 'Chicken nuggets', null, false),
-  ('f0d26fec-e7ea-4106-aa98-7564a65dd352', '4e305711-6464-4621-a4a2-138d007a26f5', 'Fried shrimp', null, false),
-  ('1bae55a1-0f28-4c6d-a833-3f1175a4f1d5', '4e305711-6464-4621-a4a2-138d007a26f5', 'Pasta', null, false);
+insert into public.ingredients (id, household_id, name, default_unit, pantry_staple, aisle) values
+  ('0ca40c5a-5423-438c-a12a-03ce6bfc65ec', '4e305711-6464-4621-a4a2-138d007a26f5', 'Pork sausage', null, false, 'meat'),
+  ('584b7427-e1e2-4241-a5f2-4d3b8da808a9', '4e305711-6464-4621-a4a2-138d007a26f5', 'Bell peppers', null, false, 'produce'),
+  ('ec52ed2c-ef4d-4cc4-a699-398c22691cbc', '4e305711-6464-4621-a4a2-138d007a26f5', 'Penne', null, false, 'pantry'),
+  ('3dfeb04d-6c5e-49c3-adf0-d7c5a520a977', '4e305711-6464-4621-a4a2-138d007a26f5', 'Chicken breast', null, false, 'meat'),
+  ('5840fbfd-eb5a-4bad-a201-9355909a571d', '4e305711-6464-4621-a4a2-138d007a26f5', 'Black beans', null, false, 'pantry'),
+  ('63f86ea9-431c-43b7-a165-58e579f76377', '4e305711-6464-4621-a4a2-138d007a26f5', 'Taco seasoning', null, false, 'pantry'),
+  ('d49c0139-9c59-469f-a860-6a5db755d247', '4e305711-6464-4621-a4a2-138d007a26f5', 'Chicken thighs', null, false, 'meat'),
+  ('37de36b7-165a-4e65-ae04-0ab71a5fffb1', '4e305711-6464-4621-a4a2-138d007a26f5', 'Potatoes', null, false, 'produce'),
+  ('fdb9e7fd-ce66-4787-a1ea-e4f1d9533f1f', '4e305711-6464-4621-a4a2-138d007a26f5', 'Chicken drumsticks', null, false, 'meat'),
+  ('09b0d85a-3e88-4d3c-ae43-64a2bcc32100', '4e305711-6464-4621-a4a2-138d007a26f5', 'Corn on the cob', null, false, 'produce'),
+  ('e1b6bd35-3075-40a7-ac58-0b8deed8390b', '4e305711-6464-4621-a4a2-138d007a26f5', 'Pork schnitzel', null, false, 'meat'),
+  ('51232348-2a2c-4082-ac9a-24e4cce5e98a', '4e305711-6464-4621-a4a2-138d007a26f5', 'Spätzle', null, false, 'pantry'),
+  ('d4e147d1-e9ee-4ab5-a822-2c853ad9bdc9', '4e305711-6464-4621-a4a2-138d007a26f5', 'Chicken nuggets', null, false, 'frozen'),
+  ('f0d26fec-e7ea-4106-aa98-7564a65dd352', '4e305711-6464-4621-a4a2-138d007a26f5', 'Fried shrimp', null, false, 'frozen'),
+  ('1bae55a1-0f28-4c6d-a833-3f1175a4f1d5', '4e305711-6464-4621-a4a2-138d007a26f5', 'Pasta', null, false, 'pantry');
 
 insert into public.products (id, household_id, store_id, name, brand, size_amount, size_unit, external_id, ean) values
   ('2dd37d64-e3de-42e6-adbe-f80cea690232', '4e305711-6464-4621-a4a2-138d007a26f5', '5592975e-4118-4c20-a023-1fc66244ba64', 'Pork sausage roll, 1 lb', null, null, null, null, null),
@@ -235,21 +235,27 @@ insert into public.ingredient_matches (id, household_id, ingredient_id, product_
   ('af404e76-e08b-4540-a93a-0cca20f9aaa0', '4e305711-6464-4621-a4a2-138d007a26f5', '1bae55a1-0f28-4c6d-a833-3f1175a4f1d5', '14986118-5b8f-45b4-acdd-dc682f3e872c', 1, true),
   ('f31a5402-a145-4ac4-a8c1-92ba1571cd78', '4e305711-6464-4621-a4a2-138d007a26f5', '1bae55a1-0f28-4c6d-a833-3f1175a4f1d5', '24805780-b522-4120-af53-03a49b3eb9cc', 1, true);
 
-insert into public.recipes (id, household_id, title, source_url, servings, time_min, tags, rating, steps, status, luke_note, sale_note, cost_by_store, created_at) values
-  ('b66ba2a1-c686-4e67-ab47-17a596b485ef', '4e305711-6464-4621-a4a2-138d007a26f5', 'Sausage and pepper pasta', null, 4, 30, array['Quick', 'Luke-friendly']::text[], 5, '[{"title":"Boil the water","text":"Bring a large pot of well-salted water to a boil."},{"title":"Brown the sausage","text":"Crumble the sausage into a large skillet over medium-high heat. Cook until browned, breaking it up as it goes.","timer_sec":360},{"title":"Soften the vegetables","text":"Add the peppers and onion to the skillet. Cook, stirring now and then, until soft.","timer_sec":300},{"title":"Cook the pasta","text":"Add the penne to the boiling water and cook until just tender.","timer_sec":660},{"title":"Set aside Luke''s portion","text":"Drain the pasta. Before anything else touches it, scoop one plain portion into a bowl for Luke.","luke":true},{"title":"Bring it together","text":"Stir the garlic and crushed tomatoes into the skillet and simmer. Toss with the pasta and top with parmesan.","timer_sec":300}]'::jsonb, 'box', 'Plain pasta for Luke', 'On sale', '{"Commissary":9.4}'::jsonb, '2026-10-26T12:00:00.000Z'),
-  ('33854ff6-a953-4e32-a64b-77e294abf5de', '4e305711-6464-4621-a4a2-138d007a26f5', 'Oven fried chicken and corn', null, 4, 45, array['Luke-friendly']::text[], 5, '[]'::jsonb, 'box', 'Luke eats this too', null, '{"Commissary":10.3}'::jsonb, '2026-10-26T11:59:00.000Z'),
-  ('f1f425f2-88b0-4206-ad64-649efee5eba2', '4e305711-6464-4621-a4a2-138d007a26f5', 'Sheet-pan chicken and potatoes', null, 4, 40, '{}', 4, '[]'::jsonb, 'box', null, null, '{"Aldi":8.6}'::jsonb, '2026-10-26T11:58:00.000Z'),
-  ('2307caf3-2110-430f-aff2-1547f6619ab3', '4e305711-6464-4621-a4a2-138d007a26f5', 'Chicken taco bowls', null, 4, 25, array['Quick']::text[], 4, '[]'::jsonb, 'box', null, null, '{"Lidl":6.3,"Commissary":5.5}'::jsonb, '2026-10-26T11:57:00.000Z'),
-  ('aeed68ce-7f4b-46e0-afe7-62b67765e3e4', '4e305711-6464-4621-a4a2-138d007a26f5', 'Schnitzel and spätzle', null, 4, 35, '{}', 5, '[]'::jsonb, 'box', null, null, '{"Kaufland":11.2}'::jsonb, '2026-10-26T11:56:00.000Z'),
-  ('0c823ea5-6ce8-490d-ad42-a86592df8c4d', '4e305711-6464-4621-a4a2-138d007a26f5', 'Beef and potato skillet', null, 4, 25, array['Quick']::text[], 3, '[]'::jsonb, 'box', null, null, '{"Commissary":10.35}'::jsonb, '2026-10-26T11:55:00.000Z'),
-  ('8ee01753-eed0-456d-a41c-4beb05973c69', '4e305711-6464-4621-a4a2-138d007a26f5', 'Chili mac', null, 4, 30, array['Quick', 'Luke-friendly']::text[], 4, '[]'::jsonb, 'box', 'Plain pasta for Luke', null, '{"Commissary":6.1,"Lidl":4.1}'::jsonb, '2026-10-26T11:54:00.000Z'),
-  ('68f4b837-0d34-43d7-a575-e6af40cdf8a7', '4e305711-6464-4621-a4a2-138d007a26f5', 'Beef tacos', null, 4, 25, array['Quick']::text[], 4, '[]'::jsonb, 'box', null, 'On sale', '{"Commissary":12.9}'::jsonb, '2026-10-26T11:53:00.000Z'),
-  ('d5609720-bf9f-47b0-acb6-eba44a90b414', '4e305711-6464-4621-a4a2-138d007a26f5', 'Pork chops and green beans', null, 4, 30, array['Quick']::text[], 4, '[]'::jsonb, 'box', null, null, '{"Aldi":5.4,"Lidl":4.5}'::jsonb, '2026-10-26T11:52:00.000Z'),
-  ('1f19a633-1601-436f-aaef-e6ab61a56557', '4e305711-6464-4621-a4a2-138d007a26f5', 'Fried shrimp and fries', null, 4, 30, array['Luke-friendly']::text[], 4, '[]'::jsonb, 'box', 'Luke eats this too', null, '{"Commissary":13.4}'::jsonb, '2026-10-26T11:51:00.000Z'),
-  ('bd97ea18-d2e1-48a2-afc2-a234c08d5cd2', '4e305711-6464-4621-a4a2-138d007a26f5', 'Homemade pizza', null, 4, 40, '{}', 4, '[]'::jsonb, 'box', null, null, '{"Lidl":5.6,"Commissary":4.2}'::jsonb, '2026-10-26T11:50:00.000Z'),
-  ('995a976c-d963-4728-a756-a1e8d541a654', '4e305711-6464-4621-a4a2-138d007a26f5', 'Sausage and sweet potato hash', null, 4, 30, '{}', null, '[]'::jsonb, 'suggested', null, 'Sausage on sale', '{"Commissary":9.3}'::jsonb, '2026-10-26T11:49:00.000Z'),
-  ('b06ecdfe-e034-4e1e-ab30-798e82551c16', '4e305711-6464-4621-a4a2-138d007a26f5', 'Creamy Tuscan chicken pasta', null, 4, 35, array['Luke-friendly']::text[], null, '[]'::jsonb, 'suggested', 'Plain pasta for Luke', null, '{"Lidl":13.45}'::jsonb, '2026-10-26T11:48:00.000Z'),
-  ('ec266dae-0899-4d86-a556-6c422092735a', '4e305711-6464-4621-a4a2-138d007a26f5', 'Honey garlic pork chops', null, 4, 30, '{}', null, '[]'::jsonb, 'suggested', null, null, '{"Aldi":9.17}'::jsonb, '2026-10-26T11:47:00.000Z');
+insert into public.recipes (id, household_id, title, source_url, servings, time_min, tags, rating, steps, status, luke_note, sale_note, cost_by_store, origin, site, photo_path, cuisine, protein, notes, created_at) values
+  ('b66ba2a1-c686-4e67-ab47-17a596b485ef', '4e305711-6464-4621-a4a2-138d007a26f5', 'Sausage and pepper pasta', null, 4, 30, array['Quick', 'Luke-friendly']::text[], 5, '[{"title":"Boil the water","text":"Bring a large pot of well-salted water to a boil."},{"title":"Brown the sausage","text":"Crumble the sausage into a large skillet over medium-high heat. Cook until browned, breaking it up as it goes.","timer_sec":360},{"title":"Soften the vegetables","text":"Add the peppers and onion to the skillet. Cook, stirring now and then, until soft.","timer_sec":300},{"title":"Cook the pasta","text":"Add the penne to the boiling water and cook until just tender.","timer_sec":660},{"title":"Set aside Luke''s portion","text":"Drain the pasta. Before anything else touches it, scoop one plain portion into a bowl for Luke.","luke":true},{"title":"Bring it together","text":"Stir the garlic and crushed tomatoes into the skillet and simmer. Toss with the pasta and top with parmesan.","timer_sec":300}]'::jsonb, 'box', 'Plain pasta for Luke', 'On sale', '{"Commissary":9.4}'::jsonb, 'manual', null, null, null, null, null, '2026-10-26T12:00:00.000Z'),
+  ('33854ff6-a953-4e32-a64b-77e294abf5de', '4e305711-6464-4621-a4a2-138d007a26f5', 'Oven fried chicken and corn', null, 4, 45, array['Luke-friendly']::text[], 5, '[]'::jsonb, 'box', 'Luke eats this too', null, '{"Commissary":10.3}'::jsonb, 'manual', null, null, null, null, null, '2026-10-26T11:59:00.000Z'),
+  ('f1f425f2-88b0-4206-ad64-649efee5eba2', '4e305711-6464-4621-a4a2-138d007a26f5', 'Sheet-pan chicken and potatoes', null, 4, 40, '{}', 4, '[]'::jsonb, 'box', null, null, '{"Aldi":8.6}'::jsonb, 'manual', null, null, null, null, null, '2026-10-26T11:58:00.000Z'),
+  ('2307caf3-2110-430f-aff2-1547f6619ab3', '4e305711-6464-4621-a4a2-138d007a26f5', 'Chicken taco bowls', null, 4, 25, array['Quick']::text[], 4, '[]'::jsonb, 'box', null, null, '{"Lidl":6.3,"Commissary":5.5}'::jsonb, 'manual', null, null, null, null, null, '2026-10-26T11:57:00.000Z'),
+  ('aeed68ce-7f4b-46e0-afe7-62b67765e3e4', '4e305711-6464-4621-a4a2-138d007a26f5', 'Schnitzel and spätzle', null, 4, 35, '{}', 5, '[]'::jsonb, 'box', null, null, '{"Kaufland":11.2}'::jsonb, 'manual', null, null, null, null, null, '2026-10-26T11:56:00.000Z'),
+  ('0c823ea5-6ce8-490d-ad42-a86592df8c4d', '4e305711-6464-4621-a4a2-138d007a26f5', 'Beef and potato skillet', null, 4, 25, array['Quick']::text[], 3, '[]'::jsonb, 'box', null, null, '{"Commissary":10.35}'::jsonb, 'manual', null, null, null, null, null, '2026-10-26T11:55:00.000Z'),
+  ('8ee01753-eed0-456d-a41c-4beb05973c69', '4e305711-6464-4621-a4a2-138d007a26f5', 'Chili mac', null, 4, 30, array['Quick', 'Luke-friendly']::text[], 4, '[]'::jsonb, 'box', 'Plain pasta for Luke', null, '{"Commissary":6.1,"Lidl":4.1}'::jsonb, 'manual', null, null, null, null, null, '2026-10-26T11:54:00.000Z'),
+  ('68f4b837-0d34-43d7-a575-e6af40cdf8a7', '4e305711-6464-4621-a4a2-138d007a26f5', 'Beef tacos', null, 4, 25, array['Quick']::text[], 4, '[]'::jsonb, 'box', null, 'On sale', '{"Commissary":12.9}'::jsonb, 'manual', null, null, null, null, null, '2026-10-26T11:53:00.000Z'),
+  ('d5609720-bf9f-47b0-acb6-eba44a90b414', '4e305711-6464-4621-a4a2-138d007a26f5', 'Pork chops and green beans', null, 4, 30, array['Quick']::text[], 4, '[]'::jsonb, 'box', null, null, '{"Aldi":5.4,"Lidl":4.5}'::jsonb, 'manual', null, null, null, null, null, '2026-10-26T11:52:00.000Z'),
+  ('1f19a633-1601-436f-aaef-e6ab61a56557', '4e305711-6464-4621-a4a2-138d007a26f5', 'Fried shrimp and fries', null, 4, 30, array['Luke-friendly']::text[], 4, '[]'::jsonb, 'box', 'Luke eats this too', null, '{"Commissary":13.4}'::jsonb, 'manual', null, null, null, null, null, '2026-10-26T11:51:00.000Z'),
+  ('bd97ea18-d2e1-48a2-afc2-a234c08d5cd2', '4e305711-6464-4621-a4a2-138d007a26f5', 'Homemade pizza', null, 4, 40, '{}', 4, '[]'::jsonb, 'box', null, null, '{"Lidl":5.6,"Commissary":4.2}'::jsonb, 'manual', null, null, null, null, null, '2026-10-26T11:50:00.000Z'),
+  ('995a976c-d963-4728-a756-a1e8d541a654', '4e305711-6464-4621-a4a2-138d007a26f5', 'Sausage and sweet potato hash', null, 4, 30, '{}', null, '[]'::jsonb, 'suggested', null, 'Sausage on sale', '{"Commissary":9.3}'::jsonb, 'manual', null, null, null, null, null, '2026-10-26T11:49:00.000Z'),
+  ('b06ecdfe-e034-4e1e-ab30-798e82551c16', '4e305711-6464-4621-a4a2-138d007a26f5', 'Creamy Tuscan chicken pasta', null, 4, 35, array['Luke-friendly']::text[], null, '[]'::jsonb, 'suggested', 'Plain pasta for Luke', null, '{"Lidl":13.45}'::jsonb, 'manual', null, null, null, null, null, '2026-10-26T11:48:00.000Z'),
+  ('ec266dae-0899-4d86-a556-6c422092735a', '4e305711-6464-4621-a4a2-138d007a26f5', 'Honey garlic pork chops', null, 4, 30, '{}', null, '[]'::jsonb, 'suggested', null, null, '{"Aldi":9.17}'::jsonb, 'manual', null, null, null, null, null, '2026-10-26T11:47:00.000Z'),
+  ('5ae04179-99af-412b-a743-46a55d6d4af3', '4e305711-6464-4621-a4a2-138d007a26f5', 'Sheet-pan gnocchi with sausage', 'https://www.budgetbytes.com/sheet-pan-gnocchi-with-sausage/', 4, 35, '{}', null, '[]'::jsonb, 'box', null, null, '{}'::jsonb, 'link', 'budgetbytes.com', null, null, null, null, '2026-11-17T12:00:00.000Z'),
+  ('7b2c2325-d0cf-4563-a0f1-9c3931a50a0b', '4e305711-6464-4621-a4a2-138d007a26f5', 'Grandma''s chicken and dumplings', null, 4, 60, '{}', null, '[]'::jsonb, 'box', null, null, '{}'::jsonb, 'photo', null, null, null, null, null, '2026-11-18T12:00:00.000Z');
+
+insert into public.picks (id, household_id, recipe_id, added_by, added_at) values
+  ('bc355cfa-33d6-4af8-a354-e56e91e67980', '4e305711-6464-4621-a4a2-138d007a26f5', '5ae04179-99af-412b-a743-46a55d6d4af3', null, '2026-11-17T12:00:00.000Z'),
+  ('1e3c8bea-ffcf-4c54-a0be-3cc6c414c02c', '4e305711-6464-4621-a4a2-138d007a26f5', '7b2c2325-d0cf-4563-a0f1-9c3931a50a0b', null, '2026-11-18T12:00:00.000Z');
 
 insert into public.plans (id, household_id, week_start) values
   ('5dd13c13-1041-427f-ab14-522736d1825b', '4e305711-6464-4621-a4a2-138d007a26f5', '2026-11-02'),
@@ -276,22 +282,22 @@ insert into public.usuals (id, household_id, ingredient_id, label, quantity_labe
   ('b2ceffa3-eda2-4c37-aa2a-ed933c0a4657', '4e305711-6464-4621-a4a2-138d007a26f5', '1bae55a1-0f28-4c6d-a833-3f1175a4f1d5', 'Pasta', '1 box', false, 1),
   ('1b33aa42-7ed4-4db4-a6d4-57aa0e7c47d0', '4e305711-6464-4621-a4a2-138d007a26f5', 'f0d26fec-e7ea-4106-aa98-7564a65dd352', 'Fried shrimp', '1 bag', false, 2);
 
-insert into public.list_items (id, household_id, plan_id, ingredient_id, label, for_label, product_id, store_id, quantity, checked, position) values
-  ('64a0634f-e9f5-4e15-a127-50631cf6f6a5', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '0ca40c5a-5423-438c-a12a-03ce6bfc65ec', 'Pork sausage roll, 1 lb', 'Mon', null, null, 1, false, 0),
-  ('95db3bde-c1d1-43bc-a1ee-0912407c2094', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '584b7427-e1e2-4241-a5f2-4d3b8da808a9', 'Bell peppers, 3 pack', 'Mon', null, null, 1, false, 1),
-  ('5f605f87-d360-4747-a771-921374fe1093', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', 'ec52ed2c-ef4d-4cc4-a699-398c22691cbc', 'Penne, 500 g', 'Mon', null, null, 1, false, 2),
-  ('57f64ea0-989b-4e42-ad07-8868d41fbdc6', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '3dfeb04d-6c5e-49c3-adf0-d7c5a520a977', 'Chicken breast, 600 g', 'Tue', null, null, 1, false, 3),
-  ('188e996a-091f-4152-a0f0-a65ee8b68676', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '5840fbfd-eb5a-4bad-a201-9355909a571d', 'Black beans, 2 cans', 'Tue', null, null, 1, false, 4),
-  ('fb45f394-908f-4d2e-a91e-10c0c5ee517e', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '63f86ea9-431c-43b7-a165-58e579f76377', 'Taco seasoning', 'Tue', null, null, 1, false, 5),
-  ('20f3b39c-d07f-4a7e-a0ec-2058df3bac7e', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', 'd49c0139-9c59-469f-a860-6a5db755d247', 'Chicken thighs, 1 kg', 'Thu', null, null, 1, false, 6),
-  ('33358cc2-a5ba-497c-a279-04820a5a66f8', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '37de36b7-165a-4e65-ae04-0ab71a5fffb1', 'Potatoes, 2 kg', 'Thu', null, null, 1, false, 7),
-  ('39f0aec4-6011-42b2-ac2e-b8b8d4744efa', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', 'fdb9e7fd-ce66-4787-a1ea-e4f1d9533f1f', 'Chicken drumsticks, 1.5 kg', 'Fri', null, null, 1, false, 8),
-  ('a29fed1f-5205-4965-a96e-69efa941c941', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '09b0d85a-3e88-4d3c-ae43-64a2bcc32100', 'Corn on the cob, 4', 'Fri', null, null, 1, false, 9),
-  ('eac30144-128f-4f7a-a7e9-c9f494d94f96', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', 'e1b6bd35-3075-40a7-ac58-0b8deed8390b', 'Pork schnitzel, 600 g', 'Sat', null, null, 1, false, 10),
-  ('42d0c7c5-5487-4413-a401-8bc94b5edbb3', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '51232348-2a2c-4082-ac9a-24e4cce5e98a', 'Spätzle, 500 g', 'Sat', null, null, 1, false, 11),
-  ('3eccbb92-502b-4a96-aaed-859a08151696', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', 'd4e147d1-e9ee-4ab5-a822-2c853ad9bdc9', 'Chicken nuggets, 2 bags', 'Luke', null, null, 1, false, 12),
-  ('95823f69-7b98-4b27-af40-c1296f2eb0bb', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', 'f0d26fec-e7ea-4106-aa98-7564a65dd352', 'Fried shrimp', 'Luke', null, null, 1, false, 13),
-  ('a937fb8a-70b5-41d6-ac51-c68edf440b0a', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '1bae55a1-0f28-4c6d-a833-3f1175a4f1d5', 'Pasta, 1 box', 'Luke', null, null, 1, false, 14);
+insert into public.list_items (id, household_id, plan_id, ingredient_id, label, for_label, product_id, store_id, quantity, checked, position, aisle, quantity_label, have_it, custom) values
+  ('64a0634f-e9f5-4e15-a127-50631cf6f6a5', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '0ca40c5a-5423-438c-a12a-03ce6bfc65ec', 'Pork sausage roll, 1 lb', 'Mon', null, null, 1, false, 0, null, null, false, false),
+  ('95db3bde-c1d1-43bc-a1ee-0912407c2094', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '584b7427-e1e2-4241-a5f2-4d3b8da808a9', 'Bell peppers, 3 pack', 'Mon', null, null, 1, false, 1, null, null, false, false),
+  ('5f605f87-d360-4747-a771-921374fe1093', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', 'ec52ed2c-ef4d-4cc4-a699-398c22691cbc', 'Penne, 500 g', 'Mon', null, null, 1, false, 2, null, null, false, false),
+  ('57f64ea0-989b-4e42-ad07-8868d41fbdc6', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '3dfeb04d-6c5e-49c3-adf0-d7c5a520a977', 'Chicken breast, 600 g', 'Tue', null, null, 1, false, 3, null, null, false, false),
+  ('188e996a-091f-4152-a0f0-a65ee8b68676', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '5840fbfd-eb5a-4bad-a201-9355909a571d', 'Black beans, 2 cans', 'Tue', null, null, 1, false, 4, null, null, false, false),
+  ('fb45f394-908f-4d2e-a91e-10c0c5ee517e', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '63f86ea9-431c-43b7-a165-58e579f76377', 'Taco seasoning', 'Tue', null, null, 1, false, 5, null, null, false, false),
+  ('20f3b39c-d07f-4a7e-a0ec-2058df3bac7e', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', 'd49c0139-9c59-469f-a860-6a5db755d247', 'Chicken thighs, 1 kg', 'Thu', null, null, 1, false, 6, null, null, false, false),
+  ('33358cc2-a5ba-497c-a279-04820a5a66f8', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '37de36b7-165a-4e65-ae04-0ab71a5fffb1', 'Potatoes, 2 kg', 'Thu', null, null, 1, false, 7, null, null, false, false),
+  ('39f0aec4-6011-42b2-ac2e-b8b8d4744efa', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', 'fdb9e7fd-ce66-4787-a1ea-e4f1d9533f1f', 'Chicken drumsticks, 1.5 kg', 'Fri', null, null, 1, false, 8, null, null, false, false),
+  ('a29fed1f-5205-4965-a96e-69efa941c941', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '09b0d85a-3e88-4d3c-ae43-64a2bcc32100', 'Corn on the cob, 4', 'Fri', null, null, 1, false, 9, null, null, false, false),
+  ('eac30144-128f-4f7a-a7e9-c9f494d94f96', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', 'e1b6bd35-3075-40a7-ac58-0b8deed8390b', 'Pork schnitzel, 600 g', 'Sat', null, null, 1, false, 10, null, null, false, false),
+  ('42d0c7c5-5487-4413-a401-8bc94b5edbb3', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '51232348-2a2c-4082-ac9a-24e4cce5e98a', 'Spätzle, 500 g', 'Sat', null, null, 1, false, 11, null, null, false, false),
+  ('3eccbb92-502b-4a96-aaed-859a08151696', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', 'd4e147d1-e9ee-4ab5-a822-2c853ad9bdc9', 'Chicken nuggets, 2 bags', 'Luke', null, null, 1, false, 12, null, null, false, false),
+  ('95823f69-7b98-4b27-af40-c1296f2eb0bb', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', 'f0d26fec-e7ea-4106-aa98-7564a65dd352', 'Fried shrimp', 'Luke', null, null, 1, false, 13, null, null, false, false),
+  ('a937fb8a-70b5-41d6-ac51-c68edf440b0a', '4e305711-6464-4621-a4a2-138d007a26f5', '5dd13c13-1041-427f-ab14-522736d1825b', '1bae55a1-0f28-4c6d-a833-3f1175a4f1d5', 'Pasta, 1 box', 'Luke', null, null, 1, false, 14, null, null, false, false);
 
 insert into public.exchange_rates (rate_date, base, quote, rate, source) values
   ('2026-10-26', 'EUR', 'USD', 1.08, 'sample');

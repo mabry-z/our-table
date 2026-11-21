@@ -9,7 +9,7 @@ import { sampleRows } from '../js/sample-data.js';
 
 // Insert order respects foreign keys. Members are linked separately (supabase/setup-members.sql).
 const ORDER = ['households', 'stores', 'ingredients', 'products', 'prices', 'ingredient_matches',
-  'recipes', 'plans', 'plan_meals', 'usuals', 'list_items', 'exchange_rates'];
+  'recipes', 'picks', 'plans', 'plan_meals', 'usuals', 'list_items', 'exchange_rates'];
 const JSONB = new Set(['steps', 'cost_by_store']);
 const UUID_ARRAYS = new Set(['default_store_ids', 'options']);
 const q = s => "'" + String(s).replace(/'/g, "''") + "'";

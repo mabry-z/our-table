@@ -113,20 +113,22 @@ Claude API through one edge function. Every request is logged with its cost.
 ## Data model
 
 Built on the phase 1 schema. Everything belongs to a household so Lydia sees the same plan and list.
+Migration `supabase/migrations/20261121120000_phase2_meal_planner.sql` makes these changes; nothing
+is dropped.
 
 | Table | Holds | Change from phase 1 |
 | --- | --- | --- |
-| `households` | Defaults: portions (4), dinners per week, time limit, units, AI on/off, monthly AI limit | Drop budget, stores, max stops, currency |
+| `households` | Defaults: portions (4), dinners per week, time limit, units, AI on/off, monthly AI limit, recipe sites | Add `ai_suggestions`, `ai_monthly_limit`, `recipe_sites`; budget, currency, stores and max stops parked |
 | `members` | Who can sign in | Same |
-| `ingredients` | Generic ingredient | Add `aisle` (produce, meat, dairy, pantry, frozen, bakery, other) |
-| `recipes` | Recipe box | Add `origin` (manual, link, photo, ai_created, ai_found), `source_url`, `site`, `photo_path`, cuisine, protein |
+| `ingredients` | Generic ingredient | Add `aisle` (produce, meat, dairy, bakery, pantry, frozen, other; "meat" shows as "Meat and seafood"), filled in once from the name |
+| `recipes` | Recipe box | Add `origin` (manual, typed, link, photo, ai_found, ai_created), `site`, `photo_path`, cuisine, protein, notes; sale note and cost parked |
 | `recipe_ingredients` | What a recipe needs | Same |
 | `plans` / `plan_meals` | A week and its dinners | Same (day, recipe, locked, leftovers night) |
-| `picks` | This week's picks tray | New: recipe id, added by, added at, plan week |
+| `picks` | This week's picks tray | New: recipe, added by, added at. Deleted when put on a night; unused picks stay |
 | `usuals` | Luke's recurring items | Same |
-| `list_items` | The shopping list | Group by aisle; drop store and price |
-| `pantry` | What's on hand | New: ingredient, from photo or typed, updated at |
-| `ai_requests` | AI usage log | New: kind, model, tokens, cost, created at |
+| `list_items` | The shopping list | Add `aisle` (for our own items), `quantity_label`, `have_it`, `custom` (kept on rebuild); product and store parked |
+| `pantry` | What's on hand | New: ingredient, label, typed or from a photo, updated at |
+| `ai_requests` | AI usage log | New: kind, model, tokens, cost, created at. Read-only in the app; only the edge function writes it |
 
 The price tables (`stores`, `products`, `prices`, `ingredient_matches`, `exchange_rates`) stay in
 the database, unused.
