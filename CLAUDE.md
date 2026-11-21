@@ -35,7 +35,7 @@ show prices, budget and store tags: keep their layout, drop those parts.
 | Shopping list | One merged list grouped by aisle; Luke's usuals added every week |
 | Kids | Luke (8) is a picky eater: his "usuals" (chicken nuggets, plain pasta, fried shrimp, fried chicken) are added to every list. Adeline (10) eats what we eat. |
 | Luke-friendly | Badge on dinners Luke can share (e.g. fried chicken, or pasta with a plain portion set aside) |
-| Filling the week | By hand (Add dinner: picks, recipe box, link, screenshot or photo, type it) or by asking the AI. Both first-class; AI only runs when asked |
+| Filling the week | Mixed freely night by night: Add dinner (picks, recipe box, find a recipe, link, screenshot or photo, type it) or the Ask bar ("find me a lemon caper fish dish for Thursday", "plan next week"). AI only runs when asked |
 | AI style | One Ask bar + results sheet of cards that update in place, with a trail of asks to undo to. Not a chat. Quiet cap of about 6 asks per sheet |
 | AI models | Claude Opus 5.5 for planning, creating and tweaking; Claude Sonnet 5.5 for search, swaps and reading photos |
 | AI spending | Every request logged with cost; monthly limit (default $10) pauses AI until the 1st |
@@ -110,11 +110,11 @@ before/after is in `mockups/readability.html`. Older mockups still show the earl
 ## Build phases
 
 1. Foundation: done.
-2. Build a week by hand: schema changes, recipe box, link import, Add dinner, This week's picks,
-   recipe page, list by aisle with editing, Luke's usuals.
-3. Photos and AI groundwork: edge function, usage log and monthly limit, screenshot and photo import
-   with flags, AI settings.
-4. The Ask bar: results sheet with trail and undo; plan, find, create, fridge photo, tweak.
+2. Build a week by hand (build order only; the finished app mixes both): schema changes, recipe box,
+   link import, Add dinner, This week's picks, recipe page, list by aisle with editing, Luke's usuals.
+3. Find, photos and AI groundwork: edge function, usage log and monthly limit, Find a recipe (in Add
+   dinner and on Recipes, with "Add to <day>"), screenshot and photo import with flags, AI settings.
+4. The Ask bar: results sheet with trail and undo, reusing Find; plan, create, fridge photo, tweak.
 5. Cook mode and learning: cook mode, ratings shaping suggestions, move / skip / freshness, pantry.
 
 Parked: Globus flyer reader, commissary flyer upload, price engine, budget and stores. See the end of

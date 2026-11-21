@@ -32,12 +32,17 @@ Web app on our phones (Plan, Recipes, List, Settings; GitHub Pages)
 
 ## Two ways to fill a week
 
-Both are first-class. The AI only runs when we ask it to.
+Both are first-class, and we mix them night by night: Monday from the recipe box, Tuesday from a
+pasted link, Thursday from "find me a lemon caper fish dish for Thursday". The AI only runs when we
+ask it to.
 
-### By hand (no suggestions)
+### Adding dinners ourselves
 
-- **Add dinner** on any open night opens a sheet: from this week's picks, from our recipe box, paste a
-  link, screenshot or photo, or type it.
+- **Add dinner** on any open night opens a sheet: from this week's picks, from our recipe box, find a
+  recipe, paste a link, screenshot or photo, or type it.
+- **Find a recipe:** type what sounds good ("lemon caper fish"). It searches our list of sites
+  (Claude with web search, 2–11¢) and shows about 3 real recipes with site and time, each with
+  "Add to <day>". Quick chips narrow it down (under 30 minutes, Luke-friendly, dairy-free).
 - **Paste a link:** read the recipe data most sites build into the page (schema.org Recipe). No AI
   and free. If a page has no recipe data, Claude reads the page instead (about 2¢).
 - **Screenshot or photo:** a cookbook page, recipe card, Instagram screenshot or handwritten recipe.
@@ -71,7 +76,8 @@ What the Ask bar does on each screen:
 
 | Screen | Examples | Result |
 | --- | --- | --- |
-| Plan | "plan next week, light on pasta", "make Friday fish", "Thursday leftovers" | Proposed week; locked dinners stay put; changed night highlighted |
+| Plan, one night | "find me a lemon caper fish dish for Thursday", then "under 30 minutes" | Real recipes from our sites, each with "Add to Thursday" |
+| Plan, the week | "plan next week, light on pasta", "make Friday fish", "Thursday leftovers" | Proposed week; locked dinners stay put; changed night highlighted |
 | Recipes, find | "find a crockpot chili Luke might eat", then "no dairy" | Real recipes from our list of sites, with site name and link |
 | Recipes, create | "make something with pork, apples and potatoes", then "milder" | A new recipe labeled "Created for you" |
 | Recipes, photo | Photo of the fridge or pantry | Items found (tap to remove, or type what was missed) → 3 ideas → full recipe |
@@ -151,7 +157,8 @@ reached, nothing on the list yet.
 
 ## Build phases
 
-Each phase ends with something we use for a real week.
+Each phase ends with something we use for a real week. "By hand" in phase 2 is build order only:
+the non-AI pieces come first so the app is useful sooner, and the finished app mixes both freely.
 
 1. **Foundation.** Done: Supabase project, tables, sign-in for both of us, four tabs styled like the
    mockups with sample data, week arrows on Plan.
@@ -159,12 +166,16 @@ Each phase ends with something we use for a real week.
    data on the page); Add dinner sheet (box, link, type); This week's picks shared between us; recipe
    page (read-only); list by aisle with editing; Luke's usuals on every list.
    - Done when: we plan and shop a real week from the app without any AI.
-3. **Photos and the AI groundwork.** Edge function with the AI key, usage log and monthly limit;
+3. **Find, photos and the AI groundwork.** Edge function with the AI key, usage log and monthly
+   limit; Find a recipe (search our list of sites, read the results with the phase 2 link importer)
+   in the Add dinner sheet and on Recipes, with "Add to <day>", "Save" and narrowing chips;
    screenshot and photo import with the check-it-over card and flags; "Choose several" into picks;
-   AI settings.
-   - Done when: we import a month of recipes from screenshots and photos without fixing much.
-4. **The Ask bar.** Results sheet with trail and undo; Plan (propose a week, change a night); Recipes
-   (find on our sites, create, fridge photo → ideas → recipe); recipe page tweaks.
+   AI settings and sites we like.
+   - Done when: we fill a real week using Find for the nights we have no recipe for, and import a
+     month of recipes from screenshots and photos without fixing much.
+4. **The Ask bar.** Results sheet with trail and undo, reusing phase 3's Find; Plan (find for a
+   named night, propose a week, change a night); Recipes (create, fridge photo → ideas → recipe);
+   recipe page tweaks.
    - Done when: the Ask bar proposes a week we'd actually cook.
 5. **Cook mode and learning.** Cook mode with timers, Wake Lock and Luke reminders; ratings shaping
    suggestions; move, skip and freshness check mid-week; pantry from photos feeding "use what we
