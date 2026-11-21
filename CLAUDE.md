@@ -67,7 +67,7 @@ Recipes and recipe pages (hidden when AI suggestions are off).
   names up to 8 well-reviewed single-recipe pages, each is read by calling `import-recipe`
   (which also returns the site's star rating and count), and the best 5 by rating come back,
   weighted by how many people rated it. Cooking time is deliberately not a factor (we choose
-  that ourselves). Pages that can't be read come back as title + link. About 3–4¢. Check callers with
+  that ourselves). Pages that can't be read come back as title + link. About 10–15¢ (measured Nov 21: 10–14¢; 4 searches at 1¢ plus 28–45K tokens of search results on Sonnet). Kept as is by choice; the browser plus Paste a link is the free route. Check callers with
   direct fetches to `/auth/v1/user`, not supabase-js `getUser` (it fails with this project's
   publishable key).
 - **Recipe page and cook mode:** ingredients scaled by a portions control, steps, source link.

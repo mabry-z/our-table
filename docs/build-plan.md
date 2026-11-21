@@ -41,7 +41,7 @@ ask it to.
 - **Add dinner** on any open night opens a sheet: from this week's picks, from our recipe box, find a
   recipe, paste a link, screenshot or photo, or type it.
 - **Find a recipe:** type what sounds good ("lemon caper fish"). It searches our list of sites
-  (Claude with web search, 2–11¢) and shows about 3 real recipes with site and time, each with
+  (Claude with web search, about 10–15¢) and shows up to 5 real recipes, best rated first, with site and time, each with
   "Add to <day>". Quick chips narrow it down (under 30 minutes, Luke-friendly, dairy-free).
 - **Paste a link:** read the recipe data most sites build into the page (schema.org Recipe). No AI
   and free. If a page has no recipe data, Claude reads the page instead (about 2¢).
@@ -102,7 +102,7 @@ Claude API through one edge function. Every request is logged with its cost.
 | Task | Model | Rough cost each |
 | --- | --- | --- |
 | Plan a week, create a recipe, tweak a recipe | Claude Opus 5.5 | 5–12¢ |
-| Find recipes (web search), swap one night | Claude Sonnet 5.5 | 2–11¢ |
+| Find recipes (up to 4 web searches), swap one night | Claude Sonnet 5.5 | Find 10–15¢ (measured); swap 2–5¢ |
 | Read a photo or screenshot | Claude Sonnet 5.5 | 2–3¢ |
 
 - Expected household use: about $4–6 a month.
@@ -175,7 +175,7 @@ the non-AI pieces come first so the app is useful sooner, and the finished app m
 3. **Find, photos and the AI groundwork.** First part built Nov 21, 2026: the `ai` edge function
    (Claude Sonnet 5.5, usage log, monthly limit in Settings), "Paste the recipe text" (added for
    sites that block the link reader, about 1¢) and screenshot or photo import (up to 4 pictures of
-   one recipe, flags for anything unclear, about 2¢). Then Find (in the Add sheet, about 3¢,
+   one recipe, flags for anything unclear, about 2¢). Then Find (in the Add sheet, about 10–15¢,
    with "Add to <day>", "Save to picks" and narrowing chips) and Sites we like in Settings, with a
    default list of 12 sites tested to work. Still to do: "Choose several" into picks, keeping
    recipe photos. Plan: Edge function with the AI key, usage log and monthly

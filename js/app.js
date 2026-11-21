@@ -13,7 +13,7 @@ const S = {
   screen: 'loading', // loading | signin | nohousehold | app | error
   tab: 'plan', week: 0, filt: 'All',
   add: null,         // Add sheet (see vAddSheet): { target, mealId, step, name, ing, url, pv, err }
-  recipe: null, edit: null, pickOpen: null, aiSpent: null,
+  recipe: null, edit: null, pickOpen: null, aiSpent: null, lastFind: null,
   pendingDel: null, swiped: null,   // recipe waiting out its Undo; recipe row swiped open
   page: null, newUsual: { label: '', qty: '' }, newSkip: '', newSite: '', setErr: '', // Settings sub-pages
   toast: '', newItem: '', newAisle: '', listErr: '', moveItem: null,
@@ -200,15 +200,23 @@ async function readRecipe(a, from, read, origin) {
   S.aiSpent = null; // refetched next time Settings opens
 }
 
-// Find: searches our sites, then shows the matches in the sheet to pick from.
+// Find: searches our sites, then shows the matches in the sheet to pick from. The last search is
+// kept for half an hour, so closing the sheet (even mid-search) never wastes one: opening Find
+// again brings it back.
+const KEEP_FIND_MS = 30 * 60 * 1000;
 async function runFind(a, q) {
   Object.assign(a, { step: 'reading', from: 'find', q, err: '' });
   render();
   let res;
   try { res = await data.aiFind(q); } catch (e) { Object.assign(a, { step: 'find', err: e.message }); return; }
-  if (S.add !== a) return;
-  Object.assign(a, { step: 'find', found: res.results, foundCost: res.cost_usd });
+  S.lastFind = { q, found: res.results, foundCost: res.cost_usd, at: Date.now() };
   S.aiSpent = null;
+  if (S.add !== a) { S.toast = `Your search for “${q}” is ready. Open Find a recipe to see it.`; return; }
+  Object.assign(a, { step: 'find', found: res.results, foundCost: res.cost_usd });
+}
+function restoreFind(a) {
+  const f = S.lastFind;
+  if (f && Date.now() - f.at < KEEP_FIND_MS && !a.found) Object.assign(a, { q: f.q, found: f.found, foundCost: f.foundCost });
 }
 // Saves a Find result (or reuses the box's copy of that link), then places it like any recipe.
 function saveFound(i, toPicks) {
@@ -305,7 +313,11 @@ const ACTIONS = {
   },
   clear: id => setMeal(id, { recipe_id: null, leftovers: false }, day => `${day} is open again.`),
   add: id => { S.add = { target: 'meal', mealId: id, step: 'menu' }; },
-  addstep: v => { Object.assign(S.add, { step: v, err: '' }); if (v !== 'link') Object.assign(S.add, { name: undefined, ing: undefined }); },
+  addstep: v => {
+    Object.assign(S.add, { step: v, err: '' });
+    if (v !== 'link') Object.assign(S.add, { name: undefined, ing: undefined });
+    if (v === 'find') restoreFind(S.add);
+  },
   boxpick: id => { if (S.add.target === 'picks') { S.add = null; addPick(id); } else placeRecipe(id); },
   frompick: id => { const p = rows.picks.find(x => x.id === id); placeRecipe(p.recipe_id); del('picks', id); refresh(); },
   filt: v => { S.filt = v; },
@@ -497,7 +509,8 @@ document.addEventListener('pointercancel', endSwipe);
 document.addEventListener('click', async e => {
   const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-rmphoto],[data-delrecipe],[data-rmusual],[data-rmskip],[data-findput],[data-findpick],[data-findmore],[data-rmsite],[data-units],[data-a]');
   if (!el || el.disabled) return;
-  if (el.dataset.a === 'closeadd' && el.classList.contains('ov') && e.target.closest('[data-stop]')) return;
+  // Tapping outside the sheet closes it, except while it's searching or reading (the × still does).
+  if (el.dataset.a === 'closeadd' && el.classList.contains('ov') && (e.target.closest('[data-stop]') || S.add?.step === 'reading')) return;
   if (justSwiped) return;                                          // the end of a swipe isn't a tap
   if (S.swiped && el.dataset.recipe) { S.swiped = null; render(); return; } // a tap closes an open row
   S.toast = '';

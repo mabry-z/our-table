@@ -25,7 +25,7 @@ export function vSettings(S, M, mode, user) {
     + `<div class="mu">${used == null ? '' : `${sp.count} ${sp.count === 1 ? 'request' : 'requests'} · `}resets on the 1st. When the limit is reached, AI reading pauses; everything else keeps working.</div></div>`
     + row('Monthly limit', stepper('lm', 'lp', '$' + limit, 'monthly AI limit'))
     + link('opensites', 'Sites we like', `${(hh.recipe_sites || []).length} sites`)
-    + row('Finding a recipe', `<span class="mu">about 3¢ each</span>`)
+    + row('Finding a recipe', `<span class="mu">about 10–15¢ each</span>`)
     + row('Reading pasted text', `<span class="mu">about 1¢ each</span>`)
     + row('Reading screenshots and photos', `<span class="mu">about 2¢ each</span>`) + `</div>`;
   const people = [...M.members.values()].filter(Boolean);

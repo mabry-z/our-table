@@ -86,7 +86,7 @@ export function vAddSheet(S, M) {
         + `<div class="ey" style="margin:14px 2px 8px">Or add something else</div>`;
     }
     if (a.target !== 'box') b += opt('data-addstep="box"', 'book', 'From our recipe box', 'Pick something we already have');
-    b += opt('data-addstep="find"', 'search', 'Find a recipe', 'Searches our recipe sites, e.g. lemon caper fish · about 3¢')
+    b += opt('data-addstep="find"', 'search', 'Find a recipe', 'Searches our recipe sites, e.g. lemon caper fish · about 10–15¢')
       + opt('data-addstep="link"', 'link', 'Paste a link', 'From a recipe site; its ingredients come too')
       + opt('data-addstep="text"', 'clipboard-text', 'Paste the recipe text', 'For sites that block links, like Allrecipes · about 1¢')
       + opt('data-addstep="photo"', 'photo', 'Screenshot or photo', 'A web page, cookbook page or recipe card · about 2¢')
@@ -98,7 +98,7 @@ export function vAddSheet(S, M) {
     const put = a.target === 'meal' ? `Add to ${day}` : a.target === 'picks' ? 'Add to picks' : 'Save';
     b += `<label class="lbl" for="findin">What sounds good?</label><div style="display:flex;gap:6px"><input class="in" id="findin" autocomplete="off" placeholder="e.g. lemon caper fish" value="${esc(a.q || '')}">`
       + `<button class="ib dk" data-a="findgo">Search</button></div><div class="err">${esc(a.err || '')}</div>`;
-    if (!a.found) b += `<div class="mu" style="margin-top:6px">Searches our recipe sites (Settings › Sites we like) for well-reviewed recipes and shows the best rated first. About 3¢ a search.</div>`;
+    if (!a.found) b += `<div class="mu" style="margin-top:6px">Searches our recipe sites (Settings › Sites we like) for well-reviewed recipes and shows the best rated first. About 10–15¢ a search; for a quick look, your phone's browser plus Paste a link costs nothing.</div>`;
     else {
       b += `<div class="mu" style="margin:12px 2px 8px">${a.found.length} ${a.found.length === 1 ? 'match' : 'matches'}${a.foundCost != null ? ` · about ${Math.max(1, Math.round(a.foundCost * 100))}¢` : ''}</div>`
         + a.found.map((x, i) => x.readable
