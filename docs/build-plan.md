@@ -1,133 +1,197 @@
-# Grocery and meal planning app: build plan
+# Meal planning app: build plan
 
-As of Oct 27, 2026
+As of Nov 21, 2026. Replaces the Oct 27 price-first plan (cheapest week from store prices). Price and
+flyer work is parked, not deleted; see "Parked" at the end.
 
 ## Overview
 
-The app builds the cheapest week of dinners for our family from real prices at the Ramstein and Vogelweh commissaries and the German stores we choose (Globus by default), then turns it into a shopping list grouped by store.
+A phone web app where we plan the week's dinners, turn them into one grocery list, and find or create
+recipes with an AI helper when we want one.
 
-- **Who it's for:** our household first (two adults, 4 portions per dinner with leftovers), shared with Lydia. Built so other families could use it later.
-- **Main goal:** cheapest weekly plan, with Luke's usual foods added to every list and Luke-friendly nights flagged.
-- **Core loop:** prices update weekly → the planner picks dinners → we lock, swap or import recipes → the shopping list sorts by store, optionally capped at a max number of stops.
-- **Look:** light, warm farmhouse style (linen backgrounds, serif headings, muted sage and terracotta), matching the approved mockups.
+- **Who it's for:** our household (two adults signed in, me and Lydia, sharing one plan and list; 4
+  portions per dinner with leftovers). Built so other families could use it later.
+- **Main goal:** make planning the week fast, whether we already know what we want or need ideas.
+- **Core loop:** fill the week (by hand from links, screenshots, photos and our recipe box, or by
+  asking the AI) → one merged grocery list by aisle → cook mode → rate it → better plans next time.
+- **No budget, no prices.** The app doesn't track what groceries cost.
+- **Look:** light, warm farmhouse style, matching the approved mockups.
 
 ## Architecture
 
-A phone web app like Cadence, backed by Supabase; anything that touches outside sites or the AI key runs in Supabase edge functions, never in the browser.
+A phone web app like Cadence, backed by Supabase. Anything that calls the AI or fetches outside pages
+runs in Supabase edge functions, never in the browser.
 
 ```
 Web app on our phones (Plan, Recipes, List, Settings; GitHub Pages)
         <->  Supabase
-               - Database and sign-in (household, recipes, plans, products and dated prices)
-               - Edge functions (flyer reading, recipe import, dinner suggestions,
-                 receipt reading; holds the AI key)
-                    ->  Ramstein / Vogelweh commissary (Freshop catalog and flyer)
-                    ->  German store flyers (weekly offers)
-                    ->  Recipe websites (embedded recipe data)
-                    ->  Claude API (suggestions and reading)
+               - Database and sign-in (household, recipes, plans, picks, list, AI usage log)
+               - Edge functions (holds the AI key)
+                    ->  Recipe sites (read a pasted link's built-in recipe data; search)
+                    ->  Claude API (ask, search, create, tweak, read photos)
 ```
 
-The app reads and saves only through Supabase. The AI functions run when we upload a flyer, tap Suggest, import a recipe or scan a receipt.
+## Two ways to fill a week
 
-## Data sources
+Both are first-class. The AI only runs when we ask it to.
 
-The commissary gives us the richest data (full catalog plus sales); German stores mostly give weekly deals, so receipts and manual entries fill the gaps.
+### By hand (no suggestions)
 
-| Source | What we get | How we get it | Refresh | Caveat |
-| --- | --- | --- | --- | --- |
-| Ramstein / Vogelweh commissary | Weekly flyer with sale and regular prices | We download the flyer PDF from shop.commissaries.com ourselves and upload it; Claude reads it in an edge function and we confirm. Store IDs 5873 and 5921 | Each new flyer | No automated access: the site's terms forbid automatic monitoring or copying |
-| Lidl, Aldi, Kaufland, Globus, REWE | Weekly offers (sale price, regular price, unit, validity dates) | A flyer aggregator such as Marktguru, or a paid unofficial scraper | Weekly | Mostly deals, not full shelf prices; Kaufland is harder to read |
-| Receipts | Real prices we actually paid, any store | Photo of receipt → AI reads line items → matched to products | Every trip | Fills shelf prices the flyers miss |
-| Manual entry | One-off prices | Tap a price on the list to correct it | As needed | Always overrides older data |
-| Recipe links | Ingredients, amounts, steps, servings | Read the recipe data most recipe sites embed (schema.org Recipe) | On import | Personal use; store a link if the app ever goes public |
-| Recipe screenshots | Same as links | AI reads the image | On import | Needs the server function |
-| AI suggestions | 3–5 dinner ideas built around this week's sales | Claude API with our preferences and sale items | On demand | Strict ingredient format so every item can be priced |
+- **Add dinner** on any open night opens a sheet: from this week's picks, from our recipe box, paste a
+  link, screenshot or photo, or type it.
+- **Paste a link:** read the recipe data most sites build into the page (schema.org Recipe). No AI
+  and free. If a page has no recipe data, Claude reads the page instead (about 2¢).
+- **Screenshot or photo:** a cookbook page, recipe card, Instagram screenshot or handwritten recipe.
+  Claude reads it (about 2–3¢) and fills in a recipe for us to check. Anything unclear is flagged
+  ("The card says 1 can of broth; we read it as 14 oz").
+- **Type it:** a name, plus ingredients if we want them on the list.
+- Every link or photo recipe is shown in a "check it over" card before saving, with "Add to <day>" or
+  "Save to picks instead". It's saved to the recipe box and its ingredients go on the list.
+- **This week's picks:** a shared tray at the top of Plan. Either of us drops links or screenshots in
+  during the week ("added by Lydia on Tuesday"); tap a pick and choose a night. "Choose several"
+  turns several screenshots into several picks. Unused picks carry over.
+- Android can share a page or screenshot straight to the app (web share target). iPhone home-screen
+  apps can't, so we copy and paste the link or pick the screenshot from Photos.
 
-Every price carries a source and a "last checked" date, so the app degrades gracefully if a source stops working.
+### Ask (the AI helper)
+
+- **One Ask bar** above the bottom tabs on Plan, Recipes and recipe pages. It takes typing, a photo or
+  a pasted link, and knows the screen it's on (the week on Plan, the recipe on a recipe page).
+- **Results sheet, not a chat.** Answers are always cards with a button to act on: a proposed week
+  ("Use this week"), found recipes ("Add to week", "Save"), a created recipe, or a list of changes
+  ("Save as a copy", "Replace recipe").
+- **Keep adjusting in plain words.** Cards update in place. Each ask shows as a chip in a trail above
+  the results; tap an older one to go back to it. "Start fresh" clears it.
+- **Quiet cap:** after about 6 asks in one sheet, a note suggests using what we have or starting
+  fresh. No visible counter. Applying a result closes the sheet; next time starts fresh.
+- **Starters:** each screen offers 2–3 starter asks that fill the box so we can edit them first.
+- **Settings switch:** "AI suggestions" off hides the Ask bar everywhere. Reading photos and
+  screenshots stays on.
+
+What the Ask bar does on each screen:
+
+| Screen | Examples | Result |
+| --- | --- | --- |
+| Plan | "plan next week, light on pasta", "make Friday fish", "Thursday leftovers" | Proposed week; locked dinners stay put; changed night highlighted |
+| Recipes, find | "find a crockpot chili Luke might eat", then "no dairy" | Real recipes from our list of sites, with site name and link |
+| Recipes, create | "make something with pork, apples and potatoes", then "milder" | A new recipe labeled "Created for you" |
+| Recipes, photo | Photo of the fridge or pantry | Items found (tap to remove, or type what was missed) → 3 ideas → full recipe |
+| Recipe page | "make it dairy-free", "no cilantro", "double it" | List of changes (struck out → new), then save as a copy or replace |
+
+## Recipe sources
+
+- **Find** searches only free, well-tested sites: Allrecipes, Budget Bytes, Serious Eats, Simply
+  Recipes, BBC Good Food, King Arthur Baking. Editable in Settings ("Sites we like"). No NYT Cooking
+  (paywalled, and its terms don't allow automated copying).
+- **Create** and photo ideas are written by Claude, not copied from a site, and labeled "Created for
+  you". Ratings after cooking ("Make again" / "Not for us") tell the planner which are keepers.
+- Fridge photos are deleted after reading; only the confirmed item list is kept, as what's on hand.
+  Recipe photos are kept with the recipe.
+- Personal use only. If the app is ever public, store a link and our own notes instead of full recipe
+  text for site recipes.
+
+## AI models and cost
+
+Claude API through one edge function. Every request is logged with its cost.
+
+| Task | Model | Rough cost each |
+| --- | --- | --- |
+| Plan a week, create a recipe, tweak a recipe | Claude Opus 5.5 | 5–12¢ |
+| Find recipes (web search), swap one night | Claude Sonnet 5.5 | 2–11¢ |
+| Read a photo or screenshot | Claude Sonnet 5.5 | 2–3¢ |
+
+- Expected household use: about $4–6 a month.
+- **Monthly spending limit** (default $10, in Settings). When it's reached, AI buttons pause until
+  the 1st; everything else keeps working.
+- Strict ingredient format on every AI recipe (amount, unit, name, aisle) so it can go on the list.
 
 ## Data model
 
-Thirteen Supabase tables cover it; everything belongs to a household so Lydia sees the same plan and list.
+Built on the phase 1 schema. Everything belongs to a household so Lydia sees the same plan and list.
 
-| Table | Holds | Key fields |
+| Table | Holds | Change from phase 1 |
 | --- | --- | --- |
-| `households` | The family and its defaults | portions (4), weekly budget, units (US/metric), default stores, max stops (0 = off), home currency |
-| `members` | Who can sign in | user id, household id, role |
-| `stores` | Stores we know about | name, chain, currency (USD/EUR), external id (Ramstein 5873) |
-| `products` | A store's item | store id, name, brand, size, unit, external id, barcode (EAN) when known |
-| `prices` | A price at a point in time | product id, price, sale price, valid from/to, source (flyer, catalog, receipt, manual), checked at |
-| `ingredients` | Generic ingredient used by recipes | name ("chicken thighs"), default unit, pantry staple flag |
-| `ingredient_matches` | Which products can stand in for an ingredient | ingredient id, product id, confidence, confirmed by us |
-| `recipes` | Recipe box | title, source url, servings, time, tags (Quick, Luke-friendly), rating, steps |
-| `recipe_ingredients` | What a recipe needs | recipe id, ingredient id, amount, unit |
-| `plans` / `plan_meals` | A week and its dinners | week start; day, recipe id, locked, leftovers night |
-| `usuals` | Luke's recurring items | ingredient id, quantity per week, skip this week |
-| `list_items` | The generated shopping list | plan id, product id, store id, quantity, checked off |
+| `households` | Defaults: portions (4), dinners per week, time limit, units, AI on/off, monthly AI limit | Drop budget, stores, max stops, currency |
+| `members` | Who can sign in | Same |
+| `ingredients` | Generic ingredient | Add `aisle` (produce, meat, dairy, pantry, frozen, bakery, other) |
+| `recipes` | Recipe box | Add `origin` (manual, link, photo, ai_created, ai_found), `source_url`, `site`, `photo_path`, cuisine, protein |
+| `recipe_ingredients` | What a recipe needs | Same |
+| `plans` / `plan_meals` | A week and its dinners | Same (day, recipe, locked, leftovers night) |
+| `picks` | This week's picks tray | New: recipe id, added by, added at, plan week |
+| `usuals` | Luke's recurring items | Same |
+| `list_items` | The shopping list | Group by aisle; drop store and price |
+| `pantry` | What's on hand | New: ingredient, from photo or typed, updated at |
+| `ai_requests` | AI usage log | New: kind, model, tokens, cost, created at |
 
-Exchange rate is stored daily so a week's totals don't shift mid-trip.
-
-## Price engine
-
-The hard part is not fetching prices but matching "2 lb chicken thighs" to the right package at each store and comparing fairly.
-
-1. **Normalize units.** Convert every product to a price per kg, liter or each, and every recipe amount to the same base. US recipes and German packaging meet here.
-2. **Convert currency.** Euro prices convert to dollars at the stored rate (€1 ≈ $1.08 is a placeholder).
-3. **Match ingredients to products.** Start with simple name matching, let the AI suggest matches for unclear ones, and remember every match we confirm. Confirmed matches always win.
-4. **Price a recipe.** For each ingredient, cost = the package we'd actually buy at the cheapest allowed store. Pantry staples cost $0.
-5. **Pick the week.** For each open night, choose the cheapest recipe that fits the time limit, skips foods we avoid, and isn't repeated. Prefer recipes that share ingredients so half-used packages get used.
-6. **Build the list.** Combine duplicate ingredients across dinners and Luke's usuals, then assign each item to its cheapest selected store.
-7. **Apply max stops (optional).** When set to 1–3, try every combination of selected stores up to that size (at most 63 combinations for 6 stores) and keep the one that drops the fewest items, then costs least, then has fewer stops. Off = cheapest store per item.
-8. **Show the trade-off.** Report which stores were skipped and the extra cost versus visiting every selected store.
+The price tables (`stores`, `products`, `prices`, `ingredient_matches`, `exchange_rates`) stay in
+the database, unused.
 
 ## Screens
 
-Four tabs, as in the approved prototype.
+Four tabs: **Plan, Recipes, List, Settings.** `mockups/ask-bar.html` is the reference for the Ask bar,
+the results sheet, Add dinner, picks and the AI settings.
 
 | Tab | What it shows | Key actions |
 | --- | --- | --- |
-| Plan | Week of dinners, weekly total vs budget, Luke's usuals | Lock, swap, rebuild unlocked, find a dinner for a leftovers night, build shopping list |
-| Recipes | Import box, this week's suggestions, recipe box | Import by link or screenshot, keep or pass suggestions, filter by Quick or Luke-friendly, rate after dinner |
-| List | Items grouped by store with subtotals; one summary line for stores and stops | Check off items, open the store sheet, choose "Just this trip" or "Save as default" |
-| Settings | Portions, dinners per week, time limit, budget, exchange rate, units, default stores, max stops, Luke's usuals, foods we skip, sharing | Edit defaults; changes flow to Plan and List |
+| Plan | This week's picks, the week of dinners, Luke's usuals, "Tonight" banner | Add dinner, pick → night, lock, move, skip, Ask |
+| Recipes | Recipe box with filters (All, Quick, Luke-friendly, New) | Open a recipe, + import (link or screenshot), Ask (find, create, photo) |
+| Recipe page | Ingredients scaled by portions, steps, source | Start cooking, Ask (tweak) |
+| List | One merged list grouped by aisle | Check off, add our own items, "have it", quantities; edits survive a rebuild |
+| Settings | Portions, dinners per week, time limit, units, Luke's usuals, foods we skip, sharing, AI helper | AI suggestions switch, monthly limit, sites we like |
 
-**Recipe page and cook mode.** Tapping a dinner on Plan opens its recipe page: ingredients scaled by a portions control (default 4) and checked off while gathering, each tagged with the store it came from, then the steps. "Start cooking" opens cook mode: one step per screen in large type, the ingredients and amounts for that step, a one-tap timer on timed steps, the screen kept awake, and a reminder at the step where Luke's plain portion gets set aside. Finishing asks "Make again" or "Not for us", which feeds the recipe rating, and notes the leftovers night. On the day itself, Plan shows a "Tonight" banner linking straight to the recipe.
+**Plan mid-week** (from `mockups/plan-midweek.html`, minus prices and store tags): ⋯ menu per dinner
+with "Move to <day>", "Skip tonight" (carries to next week, ingredients count as on hand),
+"Replace". Freshness check before moving a perishable dinner past its "cook by" day.
 
-Empty and error states to design: no prices yet for a store, an item not sold at selected stores (dashed "not sold here" box), an import that couldn't read a recipe.
+**Recipe page and cook mode** (from `mockups/recipe-and-cook-mode.html`, minus prices and store
+tags): one step per screen in large type, that step's ingredients, one-tap timers, screen kept awake,
+Luke reminder at the right step, rating at the end.
+
+Empty and error states: a link with no readable recipe, a photo that couldn't be read, AI limit
+reached, nothing on the list yet.
 
 ## Build phases
 
-Build in five phases so the app is useful from phase 2 onward; each ends with something we use for a real week.
+Each phase ends with something we use for a real week.
 
-1. **Foundation.** Supabase project, tables, sign-in for both of us, the four tabs with the farmhouse styling and sample data; Plan switches between this week and next.
-   - Done when: the prototype runs on our phones against a real database.
-2. **Prices, Globus first.** A Monday edge function downloads the public Globus Kaiserslautern flyer PDF (`globus.de/faltblatt_online/<YYYYWW>/kla/...`) and has Claude read it, with no work from us. Our own recipes; commissary products and prices we enter (Ramstein and Vogelweh shown as one "Commissary", naming the store only when one is cheaper); price per unit; upload of the weekly sales flyer PDF we download ourselves, read by Claude in an edge function and confirmed by us; real recipe costs; a read-only recipe page when tapping a dinner; building a week by hand. No automated access to the commissary site (its terms forbid it) and no DeCA recipes.
-   - Done when: a manually built week shows real commissary costs.
-3. **German stores and the list.** Flyer offers for the stores we pick, exchange rate, ingredient matching with confirmations, shopping list by store, max stops; list editing (add our own items, remove or mark "have it", change quantities, and keep our edits when the list is rebuilt).
-   - Done when: we shop a full week from the app's list.
-4. **Planner and imports.** Cheapest-week planner with lock, swap and rebuild; Luke's usuals; recipe import by link; recipe page and cook mode with timers and ratings.
-   - Done when: the app proposes a week we'd actually cook.
-5. **AI features.** Dinner suggestions from sales, screenshot import, receipt scanning to fill shelf prices.
-   - Done when: suggestions and receipts work for a month without fixes.
+1. **Foundation.** Done: Supabase project, tables, sign-in for both of us, four tabs styled like the
+   mockups with sample data, week arrows on Plan.
+2. **Build a week by hand.** Schema changes above; recipe box with add and edit; link import (recipe
+   data on the page); Add dinner sheet (box, link, type); This week's picks shared between us; recipe
+   page (read-only); list by aisle with editing; Luke's usuals on every list.
+   - Done when: we plan and shop a real week from the app without any AI.
+3. **Photos and the AI groundwork.** Edge function with the AI key, usage log and monthly limit;
+   screenshot and photo import with the check-it-over card and flags; "Choose several" into picks;
+   AI settings.
+   - Done when: we import a month of recipes from screenshots and photos without fixing much.
+4. **The Ask bar.** Results sheet with trail and undo; Plan (propose a week, change a night); Recipes
+   (find on our sites, create, fridge photo → ideas → recipe); recipe page tweaks.
+   - Done when: the Ask bar proposes a week we'd actually cook.
+5. **Cook mode and learning.** Cook mode with timers, Wake Lock and Luke reminders; ratings shaping
+   suggestions; move, skip and freshness check mid-week; pantry from photos feeding "use what we
+   have".
+   - Done when: we cook from the app for a month and the suggestions get better.
 
-Later: the chat agent, ratings that shape suggestions, a Cadence link so grocery spending shows in the budget.
+Later: Android share target, a Cadence link, an optional "on sale this week" hint from the parked
+flyer work.
 
 ## Risks and open questions
 
-The biggest risk is depending on data sources we don't control; the app should keep working on the last known prices if one breaks.
-
 | Risk | Impact | Fallback |
 | --- | --- | --- |
-| Commissary site changes or blocks requests | No fresh commissary prices | Keep last prices with a "last checked" date; receipts and manual entry |
-| Commissary terms | Automated pulls not allowed (confirmed Oct 28) | We download the flyer ourselves and upload it; shelf prices from manual entry and receipts |
-| German flyers only cover deals | Shelf prices missing for staples | Receipt scanning; manual prices |
-| Ingredient matching picks the wrong product | Wrong totals | Confirm matches once; confirmed matches always win |
+| A site has no recipe data on the page | Link import fails | Claude reads the page; or screenshot it |
+| Photo misread (amounts, handwriting) | Wrong list | Check-it-over card with flagged items before saving |
+| AI recipes untested | A dud dinner | Labeled "Created for you"; ratings teach the planner |
+| AI costs creep | Surprise bill | Usage log and a hard monthly limit |
 | AI key exposed in the front end | Someone runs up the bill | Key only in a Supabase edge function |
-| Imported recipes reused publicly | Copyright issues if the app goes public | Store links and our own notes, not full recipe text |
+| Recipe copyright if the app goes public | Legal trouble | Store links and our own notes, not full text |
 
-Decided (Oct 27):
+## Parked (Nov 21, 2026)
 
-- [x] Default German store: Globus
-- [x] Commissaries: compare Ramstein and Vogelweh
-- [x] Platform: phone web app, like Cadence
-- [x] German prices: Marktguru-style flyer aggregator
-- [x] Starting weekly grocery budget: $150
+Kept in the repo and database, not built further:
+
+- Globus Kaiserslautern flyer reader (`supabase/functions/globus-flyer`, job secret and caller
+  migrations). Never scheduled.
+- Commissary flyer upload and the price engine (unit prices, ingredient-to-product matching,
+  cheapest store, max stops). See `docs/commissary-data.md`; no automated access to the commissary
+  site is allowed under its terms.
+- Budget, stores, currency and exchange rate settings.

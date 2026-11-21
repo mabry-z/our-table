@@ -21,11 +21,11 @@ export function vList(S, M) {
     t += it.prices[k].usd;
   });
 
-  h += `<button data-a="sheet" style="width:100%;display:flex;align-items:center;gap:8px;background:#FFFDF9;border:1px solid #E9E2D6;border-radius:999px;padding:8px 14px;font-size:12px;color:#5E564C;text-align:left">`
+  h += `<button data-a="sheet" style="width:100%;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-size:13px;color:var(--btn-ink);text-align:left">`
     + `${icon('building-store')}<span style="flex:1">${sel.join(', ')} · ${c.max ? 'max ' + c.max + ' stop' + (c.max > 1 ? 's' : '') : 'no stop limit'}${S.trip ? ' · this trip' : ''}</span>${icon('adjustments-horizontal')}</button>`;
   h += `<div class="cd" style="margin-top:12px;padding:14px 16px"><div class="row" style="align-items:flex-end">`
     + `<div><div class="ey">List total</div><div class="sf" style="font-size:32px;line-height:1.1">${f(t)}</div></div>`
-    + `<div style="text-align:right"><div class="ey">Stops</div><div class="sf" style="font-size:20px">${Object.keys(groups).length}</div></div></div>`
+    + `<div style="text-align:right"><div class="ey">Stops</div><div class="sf" style="font-size:18px">${Object.keys(groups).length}</div></div></div>`
     + `<div class="mu" style="margin-top:6px">${skipped.length
       ? `Skipping ${skipped.length > 1 ? skipped.slice(0, -1).join(', ') + ' and ' + skipped.at(-1) : skipped[0]} ·${t - free.total > 0.005 ? f(t - free.total) + ' more' : 'no extra cost'} than visiting every store`
       : 'Cheapest price for every item at your stores'}</div></div>`;
@@ -33,7 +33,7 @@ export function vList(S, M) {
   h += sel.filter(k => groups[k]).map(k => {
     const g = groups[k], left = g.filter(it => !it.checked).length;
     return `<div class="cd"><div class="row" style="margin-bottom:4px"><div class="row" style="gap:8px">${pill(k)}<span class="mu">${left} of ${g.length} left</span></div>`
-      + `<span class="sf" style="font-size:19px">${f(g.reduce((a, it) => a + it.prices[k].usd, 0))}</span></div>`
+      + `<span class="sf" style="font-size:18px">${f(g.reduce((a, it) => a + it.prices[k].usd, 0))}</span></div>`
       + g.map(it => {
         const p = it.prices[k], d = it.checked;
         const where = p.store ? ` · <span style="color:${STORE_FG[k]}">at ${esc(p.store)}</span>` : '';
@@ -56,7 +56,7 @@ export function vSheet(S, M) {
   if (!S.sheet) return '';
   const d = S.draft, sel = M.chains.filter(k => d.on[k]);
   return `<div class="ov" data-a="closebg"><div class="sh" data-stop="1" role="dialog" aria-label="Stores for this list"><div class="grab"></div>`
-    + `<div class="row"><div class="sf" style="font-size:22px">Stores for this list</div><button class="ib" data-a="close" aria-label="Close" style="border:none">${icon('x')}</button></div>`
+    + `<div class="row"><div class="sf dsp" style="font-size:22px">Stores for this list</div><button class="ib" data-a="close" aria-label="Close" style="border:none">${icon('x')}</button></div>`
     + `<div class="ey" style="margin:12px 0 8px">Stores we shop · ${sel.length} selected</div>`
     + chips(M, d.on, 'ds')
     + `<div class="err">${esc(S.sheetErr)}</div>`

@@ -1,11 +1,13 @@
-# Grocery and meal planning app
+# Meal planning app
 
-A phone web app that builds the cheapest week of dinners for one family from real prices at the
-Ramstein and Vogelweh commissaries (Germany, US military) and the German stores we choose, then
-turns it into a shopping list grouped by store.
+A phone web app where our family plans the week's dinners, turns them into one grocery list, and
+finds or creates recipes with an AI helper when we want one. No budget and no prices.
 
 Read `docs/build-plan.md` for the full plan. Look at the files in `mockups/` before building any
-screen: they are the approved designs. Match their layout, wording and look.
+screen: they are the approved designs. Match their layout, wording and look. `mockups/ask-bar.html`
+is the reference for the Ask bar, the results sheet, Add dinner, This week's picks and AI settings.
+The older mockups (`app-prototype.html`, `plan-midweek.html`, `recipe-and-cook-mode.html`) still
+show prices, budget and store tags: keep their layout, drop those parts.
 
 ## How we work (always follow)
 
@@ -16,101 +18,104 @@ screen: they are the approved designs. Match their layout, wording and look.
   URL, or a screenshot) before anything is committed.
 - Work one build phase at a time. At the end of a phase, summarize what's done, what's left, and how
   to test it on a phone.
-- Keep secrets out of the front end. The Claude API key and any scraping logic live only in
-  Supabase edge functions. Use a `.env` file locally and never commit it.
+- Keep secrets out of the front end. The Claude API key lives only in Supabase edge functions. Use a
+  `.env` file locally and never commit it.
 
 ## Decisions so far
 
 | Topic | Decision |
 | --- | --- |
 | Platform | Phone web app (like our budget app "Cadence", hosted on GitHub Pages) |
-| Backend | Supabase: Postgres, auth, edge functions, scheduled jobs |
-| Users | One household, two adults signed in (me and my wife Lydia) sharing one plan and list |
+| Backend | Supabase: Postgres, auth, edge functions |
+| Users | One household, two adults signed in (me and my wife Lydia) sharing one plan, picks and list |
 | Portions | 4 per dinner by default (two adults plus leftovers) |
 | Dinners per week | 5 cooked + 2 leftovers nights (default) |
-| Weekly budget | $150 to start, editable in Settings |
-| Currency | Home currency USD; euro prices converted at a stored daily rate |
+| Budget and prices | None. Dropped Nov 21, 2026. Price and flyer work is parked (see build plan) |
 | Units | US by default, metric toggle |
-| Commissaries | Compare Ramstein (Freshop store ID 5873) and Vogelweh (store ID still to look up) |
-| Default German store | Globus. Others (Lidl, Aldi, Kaufland, REWE) selectable |
-| German price source | Marktguru-style flyer aggregator (weekly offers) |
-| Shopping list | Grouped by store; optional "max stops" (Off, 1, 2, 3); Off = cheapest store per item |
+| Shopping list | One merged list grouped by aisle; Luke's usuals added every week |
 | Kids | Luke (8) is a picky eater: his "usuals" (chicken nuggets, plain pasta, fried shrimp, fried chicken) are added to every list. Adeline (10) eats what we eat. |
 | Luke-friendly | Badge on dinners Luke can share (e.g. fried chicken, or pasta with a plain portion set aside) |
-| AI | Claude API via an edge function for dinner suggestions, screenshot recipe import, receipt reading. No chat agent yet. |
+| Filling the week | By hand (Add dinner: picks, recipe box, link, screenshot or photo, type it) or by asking the AI. Both first-class; AI only runs when asked |
+| AI style | One Ask bar + results sheet of cards that update in place, with a trail of asks to undo to. Not a chat. Quiet cap of about 6 asks per sheet |
+| AI models | Claude Opus 5.5 for planning, creating and tweaking; Claude Sonnet 5.5 for search, swaps and reading photos |
+| AI spending | Every request logged with cost; monthly limit (default $10) pauses AI until the 1st |
+| Recipe sites | Find searches only free, well-tested sites: Allrecipes, Budget Bytes, Serious Eats, Simply Recipes, BBC Good Food, King Arthur Baking. No NYT Cooking |
 
 ## Screens (see mockups)
 
-Four bottom tabs: **Plan, Recipes, List, Settings**.
+Four bottom tabs: **Plan, Recipes, List, Settings.** The Ask bar sits above the tabs on Plan,
+Recipes and recipe pages (hidden when AI suggestions are off).
 
-- **Plan:** week of dinners, weekly total vs budget, "Tonight" banner, lock / swap / rebuild
-  unlocked, Luke's usuals. After shopping: a ⋯ menu per dinner with "Move to <day>" (swaps two days),
-  "Skip tonight" (carries to next week, ingredients count as on hand), "Replace" (shows extra items
-  and cost). Freshness check warns before moving a perishable dinner past its "cook by" day.
-- **Recipes:** import by link (read schema.org Recipe JSON-LD) or screenshot (AI), this week's
-  suggestions with Keep / Pass, recipe box with Quick and Luke-friendly filters.
-- **Recipe page and cook mode:** ingredients scaled by a portions control, checked off while
-  gathering, store tag per ingredient. "Start cooking" = one step per screen, large type, that step's
-  ingredients, one-tap timers, screen kept awake (Wake Lock API), Luke reminder at the right step,
-  rating at the end ("Make again" / "Not for us").
-- **List:** items grouped by store with subtotals; check off items. Store choice and max stops sit
-  behind ONE summary line ("Ramstein, Globus · no stop limit") that opens a bottom sheet with
-  "Just this trip" and "Save as default".
-- **Settings:** portions, dinners per week, time limit, budget, exchange rate, units, default
-  stores, max stops, Luke's usuals, foods we skip, sharing.
+- **Plan:** This week's picks tray, the week of dinners, "Tonight" banner, Luke's usuals. Open nights
+  have "Add dinner". Lock, move, skip, replace via the ⋯ menu; freshness check before moving a
+  perishable dinner past its "cook by" day. Each dinner shows its source (site, from a photo, typed
+  in, from your box, new idea).
+- **Recipes:** recipe box with All, Quick, Luke-friendly and New filters; + for link or screenshot
+  import. Ask finds recipes on our sites, creates new ones, or reads a fridge photo.
+- **Recipe page and cook mode:** ingredients scaled by a portions control, steps, source link.
+  "Start cooking" = one step per screen, large type, that step's ingredients, one-tap timers, screen
+  kept awake (Wake Lock API), Luke reminder at the right step, rating at the end ("Make again" / "Not
+  for us"). Ask tweaks the recipe and shows the changes before saving.
+- **List:** one list grouped by aisle; check off, add our own items, "have it", quantities; edits
+  survive a rebuild.
+- **Settings:** portions, dinners per week, time limit, units, Luke's usuals, foods we skip, sharing;
+  AI helper (AI suggestions switch, reading photos, this month's use against the limit, sites we
+  like).
 
 ## Look and feel: warm farmhouse (Magnolia-style), light only
 
-The app stays light even when the phone is in dark mode.
+The app stays light even when the phone is in dark mode. Readability matters more than delicacy:
+every text color must reach a contrast ratio of at least 4.5 against its background (checked-off
+list items are the one deliberate exception, at 4.1). Readability pass approved Nov 21, 2026; the
+before/after is in `mockups/readability.html`. Older mockups still show the earlier, fainter values.
 
 | Token | Value | Use |
 | --- | --- | --- |
 | background | `#F7F3EC` | linen page |
 | card | `#FFFDF9` | cards, inputs |
-| card border | `#E9E2D6` | 1px card borders |
+| card border | `#E2D8C8` | 1px card borders |
 | rule | `#E4DCCF` / `#EFE8DC` | dividers |
 | ink | `#2F2B26` | text, primary buttons |
-| muted | `#857B6F` | secondary text, eyebrows |
+| muted | `#6B6157` | secondary text, eyebrows |
+| faint | `#756B5F` | inactive tabs, "Open" and "Leftovers night" |
+| placeholder | `#7F7569` | placeholder text in inputs |
+| done | `#857B6F` | checked-off list items |
+| button ink / line | `#4A433B` / `#D3C8B7` | outline button text and border |
 | accent line | `#B9A88F` | short rule under titles, locked card border |
 | sage | `#8A9A74` | progress bars, checked boxes |
-| sale tag | bg `#F5E9C9`, text `#6E5527` | "On sale" |
 | Luke tag | bg `#EDE4EE`, text `#5D4663` | Luke-friendly |
 | freshness | bg `#F8EDE6`, border `#E7CDBD`, text `#7A4632` | cook-by and warnings |
-| store tags | Commissary `#E3E8D8`/`#4F5E3E`, Lidl `#DFE6EC`/`#3F5566`, Aldi `#F1E7D2`/`#6E5527`, Kaufland `#F2E0D6`/`#7A4632`, Globus `#EAE3D3`/`#5E5338`, REWE `#F1DCDC`/`#7A3434` | pill backgrounds/text |
+| source tags | From your box `#EAE3D3`/`#5E5338`, New idea `#E3EAF0`/`#3F5566`, quick `#E8EEE0`/`#4F5E3E`, site / photo / typed `#F1ECE3`/`#6B6157` | pill backgrounds/text |
 
-- Fonts: **Cormorant Garamond 500** for titles, dish names and prices; **Lato 400** for body.
-- Eyebrow labels: 11px, uppercase, letter-spacing .12em, muted.
+- Fonts: **Lora 500** for dish names and other serif text (cards, banners, lists; 16–20px, 18px
+  for dish names); **Cormorant Garamond 600** only for page titles and section headings (22px and
+  up, class `dsp`); **Lato 400** for body.
+- Sizes: body 15px, secondary text 13px, pills and buttons 12–13px, tab labels 12px. Nothing
+  smaller than 12px.
+- Eyebrow labels: 12px, uppercase, letter-spacing .1em, muted.
 - Cards: radius 14px. Pills and buttons: fully rounded (999px). Primary button: ink background,
   linen text. Phone frame in mockups is ~380px wide; design mobile-first.
-- Icons: Tabler outline icons.
+- Bottom sheets: rounded top (22px), dimmed page behind, grab handle.
+- Icons: Tabler outline icons. AI actions use the sparkles icon.
 - Sentence case everywhere. No emoji. Flat: no gradients or heavy shadows.
 
-## Data sources (details in docs/commissary-data.md)
+## Recipes and copyright
 
-- Commissaries: **no automated access to shop.commissaries.com.** Its terms forbid automatic
-  monitoring or copying, and calling its Freshop API is treated as circumventing the site. Instead,
-  we download the weekly sales flyer PDF ourselves and upload it in the app; an edge function has
-  Claude read it into prices (source "flyer") for us to confirm. Shelf prices come from manual entry
-  and, later, receipts. Every price stores its source and "checked at" time; the app keeps working
-  on last known prices.
-- German stores: weekly offers from a flyer aggregator. Shelf prices come from receipts and manual
-  entry.
-- Recipes: our own box, link imports, DeCA recipes, AI suggestions. Personal use only; if the app is
-  ever public, store links and our own notes instead of full recipe text.
+- Sources: our own box, pasted links, screenshots and photos, Find (our list of sites), and recipes
+  Claude creates (labeled "Created for you").
+- Personal use only. If the app is ever public, store links and our own notes instead of full
+  recipe text for site recipes.
+- Fridge photos are deleted after reading; recipe photos are kept with the recipe.
 
 ## Build phases
 
-1. Foundation: Supabase project + tables, sign-in for two users, four tabs styled like the mockups
-   with sample data, week arrows on Plan.
-2. Prices, Globus first: our own recipes, products and manual prices; a Monday edge function that
-   downloads the public Globus Kaiserslautern flyer PDF and has Claude read it (fully automatic);
-   commissary flyer PDF upload (Ramstein 5873 and Vogelweh 5921, shown as one "Commissary") read
-   the same way and confirmed by us; unit prices, real recipe costs, read-only recipe page,
-   building a week by hand. No automated commissary access (we've asked DeCA for permission) and
-   no DeCA recipes. Sample data stays until we've entered a few real recipes, then is cleared.
-3. Other German stores and the list: REWE / Lidl / Aldi only where their terms allow automated
-   use (Kaufland is behind bot protection: skip), exchange rate, ingredient matching, list by store,
-   max stops, list editing (add, remove / "have it", quantities; edits survive a rebuild).
-4. Planner and imports: cheapest week, lock/swap/rebuild, move/skip mid-week, Luke's usuals, link
-   import, full recipe page and cook mode.
-5. AI: suggestions, screenshot import, receipt scanning (flyer reading moved to phase 2).
+1. Foundation: done.
+2. Build a week by hand: schema changes, recipe box, link import, Add dinner, This week's picks,
+   recipe page, list by aisle with editing, Luke's usuals.
+3. Photos and AI groundwork: edge function, usage log and monthly limit, screenshot and photo import
+   with flags, AI settings.
+4. The Ask bar: results sheet with trail and undo; plan, find, create, fridge photo, tweak.
+5. Cook mode and learning: cook mode, ratings shaping suggestions, move / skip / freshness, pantry.
+
+Parked: Globus flyer reader, commissary flyer upload, price engine, budget and stores. See the end of
+`docs/build-plan.md` and `docs/commissary-data.md`.

@@ -3,7 +3,7 @@ import { chips, stopsSeg } from './list.js';
 
 const row = (label, value) => `<div class="row" style="padding:10px 0;border-top:1px solid #EFE8DC"><span>${label}</span>${value}</div>`;
 const stepper = (dec, inc, value, what) =>
-  `<div class="row" style="gap:10px"><button class="ib" data-a="${dec}" aria-label="Less ${what}">−</button><span class="sf" style="font-size:19px">${value}</span><button class="ib" data-a="${inc}" aria-label="More ${what}">+</button></div>`;
+  `<div class="row" style="gap:10px"><button class="ib" data-a="${dec}" aria-label="Less ${what}">−</button><span class="sf" style="font-size:18px">${value}</span><button class="ib" data-a="${inc}" aria-label="More ${what}">+</button></div>`;
 
 export function vSettings(S, M, mode, user) {
   const hh = M.hh, d = S.def;

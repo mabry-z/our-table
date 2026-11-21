@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Readability pass</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Lora:wght@400;500;600&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;padding:24px 12px;background:#E9E3D9;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.note{max-width:380px;margin:0 auto 10px;font:13px/1.5 system-ui,sans-serif;color:#4F463D}
+.sw{max-width:380px;margin:0 auto 14px;display:flex;background:#DDD5C8;border-radius:999px;padding:3px}
+.sw button{flex:1;border:none;background:transparent;border-radius:999px;padding:8px;font:13px system-ui,sans-serif;color:#4F463D;cursor:pointer}
+.sw button.on{background:#2F2B26;color:#F7F3EC}
+/* ---- tokens: current ---- */
+.ph{--bg:#F7F3EC;--card:#FFFDF9;--line:#E9E2D6;--rule:#EFE8DC;--ink:#2F2B26;--mu:#857B6F;--faint:#A0968A;--ph:#9A8F82;--done:#A89E91;--btn:#5E564C;--btnline:#DCD3C5;--tab:#9A9085;
+ --body:14px;--small:12px;--ey:11px;--eysp:.12em;--pill:11px;--btnfs:12px;--sfw:500;--dish:19px;--title:30px}
+/* ---- tokens: proposed ---- */
+.ph.new{--line:#E2D8C8;--mu:#6B6157;--faint:#756B5F;--ph:#7F7569;--done:#857B6F;--btn:#4A433B;--btnline:#D3C8B7;--tab:#756B5F;
+ --body:15px;--small:13px;--ey:12px;--eysp:.1em;--pill:12px;--btnfs:13px;--sfw:600;--dish:21px;--title:32px}
+.ph{--sff:'Cormorant Garamond',Georgia,serif;--tf:'Cormorant Garamond',Georgia,serif;--tw:var(--sfw)}
+.ph.l1{--sff:Lora,Georgia,serif;--sfw:500;--dish:18px}
+.ph.l2{--sff:Lora,Georgia,serif;--tf:Lora,Georgia,serif;--sfw:500;--tw:500;--dish:18px;--title:27px}
+.fsw{max-width:380px;margin:0 auto 6px;display:flex;gap:6px;flex-wrap:wrap}
+.fsw button{flex:1;border:1px solid #CFC5B6;background:transparent;border-radius:999px;padding:7px 8px;font:12.5px system-ui,sans-serif;color:#4F463D;cursor:pointer;white-space:nowrap}
+.fsw button.on{background:#2F2B26;border-color:#2F2B26;color:#F7F3EC}
+.lab{max-width:380px;margin:0 auto 6px;font:12px system-ui,sans-serif;color:#5E564C}
+.spec{max-width:380px;margin:0 auto 14px;background:#FFFDF9;border:1px solid #E2D8C8;border-radius:14px;padding:12px 14px;box-sizing:border-box}
+.spec .r{display:flex;align-items:baseline;gap:10px;padding:6px 0;border-top:1px solid #EFE8DC;color:#2F2B26}
+.spec .r:first-child{border-top:none}
+.spec .k{width:92px;flex:none;font:11.5px/1.3 system-ui,sans-serif;color:#6B6157}
+.ph{max-width:380px;margin:0 auto;background:var(--bg);border:1px solid #E4DCCF;border-radius:28px;padding:22px 18px 0;font-family:Lato,sans-serif;font-size:var(--body);color:var(--ink);overflow:hidden}
+.sf{font-family:var(--sff);font-weight:var(--sfw)}
+.ttl{font-family:var(--tf);font-weight:var(--tw)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cd{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+.dash{background:transparent;border-style:dashed}
+.mu{color:var(--mu);font-size:var(--small)}
+.ey{font-size:var(--ey);letter-spacing:var(--eysp);text-transform:uppercase;color:var(--mu)}
+.pl{font-size:var(--pill);padding:3px 9px;border-radius:999px;white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
+.pills{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ib{background:transparent;border:1px solid var(--btnline);border-radius:999px;color:var(--btn);font-size:var(--btnfs);padding:5px 11px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font-family:inherit}
+.dk{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.dish{font-size:var(--dish);line-height:1.25;margin-top:2px}
+.in{width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--btnline);border-radius:999px;padding:9px 14px;font:inherit;font-size:var(--small);color:var(--ink)}
+.in::placeholder{color:var(--ph)}
+.it{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--rule)}
+.bx{width:18px;height:18px;border:1px solid #B9A88F;border-radius:5px;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px}
+.bx.on{background:#8A9A74;border-color:#8A9A74;color:#FFFDF9}
+.done{color:var(--done);text-decoration:line-through}
+.tabs{display:flex;justify-content:space-around;border-top:1px solid #E4DCCF;margin:14px -18px 0;padding:10px 0 14px}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--tab)}
+.tab i{font-size:20px}.tab.on{color:var(--ink)}
+table{max-width:380px;margin:16px auto 0;border-collapse:collapse;font:12.5px/1.4 system-ui,sans-serif;color:#2F2B26;width:100%}
+th,td{text-align:left;padding:6px 6px;border-bottom:1px solid #D9D0C2}
+th{font-weight:600;color:#4F463D}
+td.n{text-align:right;white-space:nowrap}
+.bad{color:#A3412E;font-weight:600}.ok{color:#3F5A2A;font-weight:600}
+.sm{max-width:380px;margin:8px auto 0;font:12px/1.5 system-ui,sans-serif;color:#5E564C}
+</style></head><body>
+<p class="note"><b>Readability pass</b> · Approved Nov 21, 2026: Proposed, with Lora for dish names. Same screen, current colors and sizes vs. the proposed ones. The look stays the same: same linen, same serif, same pills. Text that was faint gets darker and small text gets a bit bigger.</p>
+<div class="sw"><button data-v="0">Current</button><button data-v="1" class="on">Proposed</button></div>
+<div class="lab">Serif font (applies to Proposed)</div>
+<div class="fsw"><button data-f="">Cormorant, heavier</button><button data-f="l1" class="on">Lora for dish names</button><button data-f="l2">Lora everywhere</button></div>
+<div class="spec" style="margin-top:8px">
+ <div class="r"><span class="k">Cormorant 500<br>today</span><span style="font:500 19px 'Cormorant Garamond',Georgia,serif">Oven fried chicken and corn</span></div>
+ <div class="r"><span class="k">Cormorant 600<br>heavier</span><span style="font:600 21px 'Cormorant Garamond',Georgia,serif">Oven fried chicken and corn</span></div>
+ <div class="r"><span class="k">Lora 500</span><span style="font:500 18px Lora,Georgia,serif">Oven fried chicken and corn</span></div>
+ <div class="r"><span class="k">Page title<br>Cormorant · Lora</span><span style="font:500 26px 'Cormorant Garamond',Georgia,serif">Our table</span><span style="font:500 23px Lora,Georgia,serif;margin-left:auto">Our table</span></div>
+</div>
+<div class="ph new l1" id="ph">
+ <div style="text-align:center"><div class="ey">Week of November 23</div><div class="ttl" style="font-size:var(--title);line-height:1.2;margin-top:4px">Our table this week</div><div style="width:36px;border-top:1px solid #B9A88F;margin:10px auto 16px"></div></div>
+ <div class="cd row" style="background:var(--ink);border-color:var(--ink);color:var(--bg)"><div><div class="ey" style="color:#D6CCBD">Tonight</div><div class="sf" style="font-size:var(--dish);margin-top:2px">Sheet-pan chicken and potatoes</div></div><button class="ib" style="border-color:var(--bg);color:var(--bg)"><i class="ti ti-chef-hat"></i> Cook</button></div>
+ <div class="cd"><div class="ey">This week's picks · 1</div><div class="row" style="margin-top:8px"><div><div class="sf" style="font-size:calc(var(--dish) - 2px)">Grandma's chicken and dumplings</div><div class="mu">From a photo · added by Lydia on Tuesday</div></div><i class="ti ti-chevron-down" style="color:var(--mu)"></i></div></div>
+ <div class="cd"><div class="row" style="align-items:flex-start"><div><div class="ey">Wednesday</div><div class="sf dish">Oven fried chicken and corn</div></div><i class="ti ti-dots" style="color:var(--mu);font-size:18px"></i></div>
+  <div class="pills"><span class="pl" style="background:#EAE3D3;color:#5E5338"><i class="ti ti-book"></i> From your box</span><span class="pl" style="background:#EDE4EE;color:#5D4663"><i class="ti ti-heart"></i> Luke eats this too</span></div></div>
+ <div class="cd row dash"><div><div class="ey">Thursday</div><div class="sf" style="font-size:calc(var(--dish) - 1px);color:var(--faint)">Leftovers night</div></div></div>
+ <div class="cd row dash"><div><div class="ey">Friday</div><div class="sf" style="font-size:calc(var(--dish) - 1px);color:var(--faint)">Open</div></div><button class="ib"><i class="ti ti-plus"></i> Add dinner</button></div>
+ <div class="cd"><div class="ey">Produce</div>
+  <div class="it" style="border-top:none"><span class="bx"></span><span style="flex:1">Bell peppers</span><span class="mu">3</span></div>
+  <div class="it"><span class="bx on"><i class="ti ti-check"></i></span><span class="done" style="flex:1">Yellow onions</span><span class="mu">2</span></div>
+  <div class="it"><span class="bx"></span><span style="flex:1">Russet potatoes</span><span class="mu">3 lb</span></div></div>
+ <input class="in" placeholder="Ask about next week…" aria-label="Ask">
+ <div class="tabs"><div class="tab on"><i class="ti ti-calendar"></i>Plan</div><div class="tab"><i class="ti ti-book"></i>Recipes</div><div class="tab"><i class="ti ti-list-check"></i>List</div><div class="tab"><i class="ti ti-settings"></i>Settings</div></div>
+</div>
+<table>
+<tr><th>Text</th><th>Current</th><th>Proposed</th></tr>
+<tr><td>Secondary text and labels (on cards)</td><td class="n">#857B6F <span class="bad">4.1</span></td><td class="n">#6B6157 <span class="ok">6.0</span></td></tr>
+<tr><td>Secondary text (on the page)</td><td class="n"><span class="bad">3.8</span></td><td class="n"><span class="ok">5.5</span></td></tr>
+<tr><td>Inactive tabs</td><td class="n">#9A9085 <span class="bad">3.1</span></td><td class="n">#756B5F <span class="ok">5.1</span></td></tr>
+<tr><td>"Open" and "Leftovers night"</td><td class="n">#A0968A <span class="bad">2.6</span></td><td class="n">#756B5F <span class="ok">4.7</span></td></tr>
+<tr><td>Placeholder text in boxes</td><td class="n">#9A8F82 <span class="bad">3.1</span></td><td class="n">#7F7569 <span class="ok">4.4</span></td></tr>
+<tr><td>Checked-off list items</td><td class="n">#A89E91 <span class="bad">2.6</span></td><td class="n">#857B6F <span class="ok">4.1</span></td></tr>
+<tr><td>Outline button text</td><td class="n">#5E564C <span class="ok">7.1</span></td><td class="n">#4A433B <span class="ok">9.6</span></td></tr>
+<tr><td>Main text</td><td class="n">#2F2B26 <span class="ok">13.8</span></td><td class="n">unchanged</td></tr>
+<tr><td>Tag pills (box, Luke, new, quick)</td><td class="n"><span class="ok">5.1–6.7</span></td><td class="n">colors unchanged</td></tr>
+</table>
+<p class="sm">Numbers are contrast ratios against the background. 4.5 is the usual minimum for small text; higher is easier to read. Pill colors were already fine, so only their size changes. Checked-off items stay a little dim on purpose.</p>
+<table>
+<tr><th>Size and weight</th><th>Current</th><th>Proposed</th></tr>
+<tr><td>Body text</td><td class="n">14px</td><td class="n">15px</td></tr>
+<tr><td>Secondary text</td><td class="n">12px</td><td class="n">13px</td></tr>
+<tr><td>Eyebrow labels</td><td class="n">11px, wide spacing</td><td class="n">12px, a bit tighter</td></tr>
+<tr><td>Pills and buttons</td><td class="n">11–12px</td><td class="n">12–13px</td></tr>
+<tr><td>Serif (dish names, titles)</td><td class="n">weight 500, 19px</td><td class="n">weight 600, 21px</td></tr>
+<tr><td>Card borders</td><td class="n">#E9E2D6</td><td class="n">#E2D8C8, a touch more defined</td></tr>
+</table>
+<script>
+const ph=document.getElementById('ph');let font='l1';
+function setFont(){ph.classList.remove('l1','l2');if(font&&ph.classList.contains('new'))ph.classList.add(font)}
+document.querySelectorAll('.sw button').forEach(b=>b.onclick=()=>{ph.classList.toggle('new',b.dataset.v==='1');document.querySelectorAll('.sw button').forEach(x=>x.classList.toggle('on',x===b));setFont()});
+document.querySelectorAll('.fsw button').forEach(b=>b.onclick=()=>{font=b.dataset.f;document.querySelectorAll('.fsw button').forEach(x=>x.classList.toggle('on',x===b));if(!ph.classList.contains('new'))document.querySelector('.sw [data-v="1"]').click();else setFont()});
+</script>
+</body></html>
