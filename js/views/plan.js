@@ -2,6 +2,7 @@ import { DAYS } from '../model.js';
 import { esc, icon, lukePill, sourcePill, weekHead } from '../ui.js';
 
 function addBtn(m) { return `<button class="ib" data-add="${m.id}">${icon('plus')} Add dinner</button>`; }
+const originIcon = r => (r.origin === 'photo' ? 'photo' : r.origin === 'link' || r.origin === 'ai_found' ? 'link' : r.origin === 'typed' ? 'pencil' : 'book');
 
 function mealCard(m, ro) {
   const day = DAYS[m.day - 1];
@@ -13,7 +14,7 @@ function mealCard(m, ro) {
   const pills = [sourcePill(r), r.time_min ? `<span class="pl" style="background:#E8EEE0;color:#4F5E3E">${icon('clock')} ${r.time_min} min</span>` : '', r.luke_note ? lukePill(r.luke_note) : ''].join('');
   return `<div class="cd"${L ? ' style="border-color:#B9A88F"' : ''}>`
     + `<div class="ey">${day}${L ? ' · locked' : ''}</div>`
-    + `<div class="sf" style="font-size:18px;line-height:1.25;margin-top:2px">${esc(r.title)}</div>`
+    + `<button class="rrow" data-openrecipe="${r.id}" style="padding:2px 0 0"><span class="sf" style="flex:1;font-size:18px;line-height:1.25">${esc(r.title)}</span>${icon('chevron-right')}</button>`
     + (pills ? `<div class="pills">${pills}</div>` : '')
     + (ro ? '' : `<div class="acts"><button class="ib ${L ? 'dk' : ''}" data-lock="${m.id}">${icon(L ? 'lock' : 'lock-open')} ${L ? 'Locked' : 'Lock'}</button>`
       + (L || m.options.length < 2 ? '' : `<button class="ib" data-swap="${m.id}">${icon('arrows-exchange')} Swap</button>`)
@@ -21,10 +22,29 @@ function mealCard(m, ro) {
     + `</div>`;
 }
 
+// This week's picks: recipes either of us drops in, waiting for a night.
+function picksTray(S, M, wk) {
+  const by = p => (p.added_by && p.added_by === S.user?.id ? 'you' : M.members.get(p.added_by));
+  const nights = wk.id && !wk.past ? wk.meals.filter(m => !m.recipe) : [];
+  let h = `<div class="cd"><div class="row"><div class="ey">This week's picks${M.picks.length ? ' · ' + M.picks.length : ''}</div>`
+    + `<button class="ib" data-a="addpick">${icon('plus')} Add</button></div>`;
+  if (!M.picks.length) return h + `<div class="mu" style="margin-top:6px">Drop links and recipes here as you find them. Either of you can add; give them a night when you're ready.</div></div>`;
+  return h + M.picks.map((p, j) => {
+    const open = S.pickOpen === p.id;
+    return `<button class="rrow" data-pickopen="${p.id}" aria-expanded="${open}" style="${j ? 'border-top:1px solid var(--rule2);' : ''}">`
+      + `<span class="src">${icon(originIcon(p.recipe))}</span><span style="flex:1"><span class="sf" style="display:block;font-size:16px;line-height:1.25">${esc(p.recipe.title)}</span>`
+      + `<span class="mu">${[p.recipe.site, by(p) ? 'added by ' + esc(by(p)) : ''].filter(Boolean).join(' · ')}</span></span>${icon(open ? 'chevron-up' : 'chevron-down')}</button>`
+      + (open ? `<div style="padding:0 0 10px 40px"><div class="mu" style="margin-bottom:6px">${!wk.id ? 'Start this week to give it a night.' : nights.length ? 'Put it on' : 'Every night has a dinner. Clear one to make room.'}</div>`
+        + `<div class="pills" style="margin-top:0">${nights.map(m => `<button class="ib dk" data-pickto="${m.id}">${DAYS[m.day - 1].slice(0, 3)}</button>`).join('')}`
+        + `<button class="ib" data-openrecipe="${p.recipe.id}">Recipe</button><button class="ib" data-unpick="${p.id}">Remove</button></div></div>` : '');
+  }).join('') + `</div>`;
+}
+
 export function vPlan(S, M) {
   const wk = M.weeks[S.week];
   let h = weekHead(S, M, 'Our table this week');
   if (S.toast) h += `<div class="toast">${icon('check')}<span style="flex:1">${esc(S.toast)}</span></div>`;
+  if (!wk.past) h += picksTray(S, M, wk);
   if (!wk.id) {
     return h + `<div class="cd ghost" style="text-align:center;padding:20px 16px"><div class="sf" style="font-size:18px">Nothing planned yet</div>`
       + `<div class="mu" style="margin:4px 0 12px">Start the week, then add a dinner to each night.</div>`
@@ -41,40 +61,64 @@ export function vPlan(S, M) {
   return h;
 }
 
-// The Add dinner sheet: from this week's picks, the recipe box, typed in, or a leftovers night.
+// The Add sheet, for a night, for This week's picks, or for the recipe box.
+// S.add = { target: 'meal' | 'picks' | 'box', mealId?, step, name, ing, url, pv, err }
 export function vAddSheet(S, M) {
   const a = S.add;
   if (!a) return '';
-  const meal = M.weeks[S.week].meals.find(m => m.id === a.mealId);
-  if (!meal) return '';
-  const day = DAYS[meal.day - 1];
+  const meal = a.target === 'meal' ? M.weeks[S.week].meals.find(m => m.id === a.mealId) : null;
+  if (a.target === 'meal' && !meal) return '';
+  const day = meal && DAYS[meal.day - 1];
+  const title = a.target === 'meal' ? `Add to ${day}` : a.target === 'picks' ? "Add to this week's picks" : 'Add a recipe';
+  const done = a.target === 'meal' ? `Add to ${day}` : a.target === 'picks' ? 'Add to picks' : 'Save to recipe box';
   const opt = (data, ic, label, sub) => `<button class="opt" ${data}>${icon(ic)}<span style="flex:1">${label}${sub ? `<br><span class="mu">${sub}</span>` : ''}</span>${icon('chevron-right')}</button>`;
   let b = '';
   if (a.step === 'menu') {
-    if (M.picks.length) {
+    if (a.target === 'meal' && M.picks.length) {
       b += `<div class="ey" style="margin:4px 2px 8px">From this week's picks</div>`
-        + M.picks.map(p => `<button class="opt" data-frompick="${p.id}">${icon(p.recipe.origin === 'photo' ? 'photo' : p.recipe.origin === 'link' ? 'link' : 'book')}<span style="flex:1">${esc(p.recipe.title)}${M.members.get(p.added_by) ? `<br><span class="mu">added by ${esc(M.members.get(p.added_by))}</span>` : ''}</span></button>`).join('')
+        + M.picks.map(p => `<button class="opt" data-frompick="${p.id}">${icon(originIcon(p.recipe))}<span style="flex:1">${esc(p.recipe.title)}${M.members.get(p.added_by) ? `<br><span class="mu">added by ${esc(M.members.get(p.added_by))}</span>` : ''}</span></button>`).join('')
         + `<div class="ey" style="margin:14px 2px 8px">Or add something else</div>`;
     }
-    b += opt('data-addstep="box"', 'book', 'From our recipe box', 'Pick something we already have')
+    if (a.target !== 'box') b += opt('data-addstep="box"', 'book', 'From our recipe box', 'Pick something we already have');
+    b += opt('data-addstep="link"', 'link', 'Paste a link', 'From a recipe site; its ingredients come too')
       + opt('data-addstep="type"', 'pencil', 'Type it', 'Just a name, plus ingredients if you want them on the list')
-      + (meal.leftovers ? '' : opt('data-a="leftovers"', 'bowl', 'Leftovers night', 'No cooking; nothing added to the list'))
-      + `<div class="mu" style="margin:10px 2px 0">Pasting a link, Find and photos are coming in the next updates.</div>`;
+      + (a.target === 'meal' && !meal.leftovers ? opt('data-a="leftovers"', 'bowl', 'Leftovers night', 'No cooking; nothing added to the list') : '')
+      + `<div class="mu" style="margin:10px 2px 0">Find and photos are coming in the next phase.</div>`;
   }
   if (a.step === 'box') {
     const box = M.recipes.filter(r => r.status === 'box').sort((x, y) => x.title.localeCompare(y.title));
-    b += box.length ? box.map(r => `<button class="opt" data-boxpick="${r.id}">${icon('book')}<span style="flex:1">${esc(r.title)}<br><span class="mu">${r.time_min ? r.time_min + ' min' : 'No time set'}${r.luke_note ? ' · ' + esc(r.luke_note) : ''}</span></span></button>`).join('')
-      : `<div class="cd ghost mu">The recipe box is empty. Type a dinner in instead.</div>`;
+    b += box.length ? box.map(r => `<button class="opt" data-boxpick="${r.id}">${icon(originIcon(r))}<span style="flex:1">${esc(r.title)}<br><span class="mu">${r.time_min ? r.time_min + ' min' : 'No time set'}${r.luke_note ? ' · ' + esc(r.luke_note) : ''}</span></span></button>`).join('')
+      : `<div class="cd ghost mu">The recipe box is empty. Paste a link or type a dinner in instead.</div>`;
+  }
+  if (a.step === 'link') {
+    b += `<label class="lbl" for="linkin">Recipe link</label><div style="display:flex;gap:6px"><input class="in" id="linkin" type="url" inputmode="url" autocomplete="off" placeholder="budgetbytes.com/…" value="${esc(a.url || '')}">`
+      + `<button class="ib dk" data-a="linkgo">Read it</button></div>`
+      + `<div class="err">${esc(a.err || '')}</div>`
+      + `<div class="mu" style="margin-top:6px">Works with most recipe sites. You'll get to check it before it's saved.</div>`;
+  }
+  if (a.step === 'reading') b += `<div class="cd" style="text-align:center"><div class="sf" style="font-size:18px">Reading the recipe…</div><div class="mu">${esc(a.url || '')}</div></div>`;
+  if (a.step === 'preview') {
+    const p = a.pv;
+    b += `<div class="mu" style="margin:0 2px 8px">Check it over. You can fix anything before it's saved.</div>`
+      + `<div class="ey">${esc(p.site || '')}${p.time_min ? ' · ' + p.time_min + ' min' : ''}${p.servings ? ' · serves ' + p.servings : ''}${p.steps?.length ? ' · ' + p.steps.length + ' steps' : ''}</div>`
+      + `<label class="lbl" for="pvtitle">Name</label><input class="in" id="pvtitle" value="${esc(a.name ?? p.title)}" autocomplete="off">`
+      + `<label class="lbl" for="pving">Ingredients · they go on the list</label><textarea class="fld" id="pving" rows="${Math.min(10, Math.max(3, p.ingredients.length))}">${esc(a.ing ?? p.ingredients.join('\n'))}</textarea>`
+      + (p.dupe ? `<div class="mu" style="margin-top:6px">${icon('info-circle')} This recipe is already in the box; it'll be used, not copied.</div>` : '')
+      + `<div class="err">${esc(a.err || '')}</div>`
+      + (a.target === 'meal'
+        ? `<div style="display:flex;gap:8px;margin-top:10px"><button class="ib" data-a="savepick" style="flex:1;justify-content:center;padding:10px">Save to picks instead</button><button class="ib dk" data-a="savelink" style="flex:1;justify-content:center;padding:10px">${done}</button></div>`
+        : `<button class="big dk" data-a="savelink">${done}</button>`);
   }
   if (a.step === 'type') {
     b += `<label class="lbl" for="tyname">Dinner</label><input class="in" id="tyname" placeholder="e.g. Tacos" autocomplete="off" value="${esc(a.name || '')}">`
       + `<label class="lbl" for="tying">Ingredients, optional</label><textarea class="fld" id="tying" rows="5" placeholder="One per line, e.g.&#10;1 lb ground beef&#10;8 tortillas&#10;1 bag shredded cheese">${esc(a.ing || '')}</textarea>`
       + `<div class="mu" style="margin-top:4px">They go on the shopping list. Saved to the recipe box too.</div>`
       + `<div class="err">${esc(a.err || '')}</div>`
-      + `<button class="big dk" data-a="typego">Add to ${day}</button>`;
+      + `<button class="big dk" data-a="typego">${done}</button>`;
   }
-  return `<div class="ov" data-a="closeadd"><div class="sh" data-stop="1" role="dialog" aria-label="Add dinner to ${day}"><div class="grab"></div>`
-    + `<div class="row" style="margin-bottom:10px"><div class="row" style="gap:2px">${a.step !== 'menu' ? `<button class="ib" data-addstep="menu" aria-label="Back" style="border:none;padding:4px">${icon('chevron-left')}</button>` : ''}<div class="sf dsp" style="font-size:22px">Add to ${day}</div></div>`
+  const back = !['menu', 'reading'].includes(a.step) && !(a.target === 'box' && a.step === a.first);
+  return `<div class="ov" data-a="closeadd"><div class="sh" data-stop="1" role="dialog" aria-label="${title}"><div class="grab"></div>`
+    + `<div class="row" style="margin-bottom:10px"><div class="row" style="gap:2px">${back ? `<button class="ib" data-addstep="${a.step === 'preview' ? 'link' : 'menu'}" aria-label="Back" style="border:none;padding:4px">${icon('chevron-left')}</button>` : ''}<div class="sf dsp" style="font-size:22px">${title}</div></div>`
     + `<button class="ib" data-a="closeadd" aria-label="Close" style="border:none">${icon('x')}</button></div>`
     + `<div class="shb">${b}</div></div></div>`;
 }

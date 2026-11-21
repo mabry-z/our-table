@@ -3,17 +3,18 @@ import * as data from './data.js';
 import { assemble, guessAisle, AISLES, DAYS, DAY_SHORT } from './model.js';
 import { esc, icon } from './ui.js';
 import { vPlan, vAddSheet } from './views/plan.js';
-import { vRecipes } from './views/recipes.js';
+import { vRecipes, editFields } from './views/recipes.js';
 import { vList } from './views/list.js';
 import { vSettings } from './views/settings.js';
 import { vSignin, vNoHousehold } from './views/signin.js';
 
 const S = {
   screen: 'loading', // loading | signin | nohousehold | app | error
-  tab: 'plan', week: 0, filt: 'All', kept: {},
-  add: null,         // Add dinner sheet: { mealId, step: 'menu' | 'box' | 'type', name, ing, err }
+  tab: 'plan', week: 0, filt: 'All',
+  add: null,         // Add sheet (see vAddSheet): { target, mealId, step, name, ing, url, pv, err }
+  recipe: null, edit: null, pickOpen: null,
   toast: '', newItem: '', newAisle: '', listErr: '', moveItem: null,
-  url: '', impErr: '', impMsg: '', email: '', signErr: '', busy: false, err: '', user: null,
+  email: '', signErr: '', busy: false, err: '', user: null,
 };
 let M = null;
 let rows = null;
@@ -108,12 +109,71 @@ function placeRecipe(recipeId) {
 // What to call a list item in messages: its ingredient's name, else its label.
 function itemName(it) { return rows.ingredients.find(i => i.id === it.ingredient_id)?.name || it.label; }
 
-// "1 1/2 lb chicken thighs, cut up" -> "Chicken thighs"
+// "1 1/2 lb chicken thighs, cut up" -> "Chicken thighs"; "2 cups cheddar – divided" -> "Cheddar"
 const UNIT = /^\s*[\d¼½¾⅓⅔⅛.,\/\s-]*\s*(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|cans?|bags?|packs?|packages?|boxes?|bunch(es)?|cloves?|heads?|jars?|bottles?|pieces?|slices?|sticks?)?\.?\s+(of\s+)?/i;
 function ingredientName(line) {
-  const n = line.replace(UNIT, '').split(',')[0].trim() || line.trim();
+  const n = line.replace(UNIT, '').split(/,|\s[–—-]\s|\(/)[0].trim() || line.trim();
   return n.charAt(0).toUpperCase() + n.slice(1);
 }
+const lines = text => (text || '').split('\n').map(l => l.trim()).filter(Boolean);
+const toInt = v => (parseInt(v, 10) > 0 ? parseInt(v, 10) : null);
+
+// Replaces a recipe's ingredients with these lines, reusing ingredients we already know.
+function setIngredients(recipeId, list) {
+  rows.recipe_ingredients.filter(ri => ri.recipe_id === recipeId).forEach(ri => del('recipe_ingredients', ri.id));
+  list.forEach((line, i) => {
+    const n = ingredientName(line);
+    const ing = rows.ingredients.find(x => x.name.toLowerCase() === n.toLowerCase())
+      || add('ingredients', { name: n, pantry_staple: false, aisle: guessAisle(n) });
+    add('recipe_ingredients', { recipe_id: recipeId, ingredient_id: ing.id, note: line, position: i });
+  });
+}
+
+function saveRecipe({ title, origin, source_url = null, site = null, time_min = null, servings = null, steps = [], ing }) {
+  const recipe = add('recipes', {
+    title: title.charAt(0).toUpperCase() + title.slice(1), origin, status: 'box', source_url, site, time_min,
+    servings: servings || M.hh.portions, tags: [], steps, created_at: new Date().toISOString(),
+  });
+  setIngredients(recipe.id, ing);
+  return recipe;
+}
+
+function addPick(recipeId) {
+  const r = rows.recipes.find(x => x.id === recipeId);
+  if (rows.picks.some(p => p.recipe_id === recipeId)) { S.toast = `${r.title} is already in this week's picks.`; return; }
+  add('picks', { recipe_id: recipeId, added_by: S.user?.id ?? null, added_at: new Date().toISOString() });
+  refresh();
+  S.toast = `${r.title} is in this week's picks.`;
+}
+
+// After saving a recipe from the Add sheet: put it on the night, in the picks, or open it.
+function finishAdd(recipe, toPicks) {
+  const a = S.add;
+  if (a.target === 'meal' && !toPicks) return placeRecipe(recipe.id);
+  S.add = null;
+  if (a.target === 'picks' || toPicks) return addPick(recipe.id);
+  refresh();
+  S.recipe = recipe.id;
+  S.toast = 'Saved to the recipe box.';
+}
+
+// Saves the checked-over recipe from a link (or reuses it if the box already has that link).
+function saveLink(toPicks) {
+  const a = S.add, p = a.pv;
+  const recipe = p.dupe ? rows.recipes.find(r => r.id === p.dupe) : saveRecipe({
+    title: (a.name ?? p.title).trim() || p.title, origin: 'link', source_url: p.source_url, site: p.site,
+    time_min: p.time_min, servings: p.servings, steps: p.steps || [], ing: lines(a.ing ?? p.ingredients.join('\n')),
+  });
+  finishAdd(recipe, toPicks);
+}
+
+// Planned weeks that use a recipe get their lists redone when the recipe changes.
+function resyncRecipe(recipeId) {
+  const plans = new Set(rows.plan_meals.filter(m => m.recipe_id === recipeId).map(m => m.plan_id));
+  plans.forEach(id => { if (!M.weeks.find(w => w.id === id)?.past) syncList(id); });
+}
+
+function openRecipe(id) { S.tab = 'recipes'; S.recipe = id; S.edit = null; S.add = null; window.scrollTo(0, 0); }
 
 async function start() {
   S.screen = 'loading'; render();
@@ -136,7 +196,7 @@ async function start() {
 }
 
 const ACTIONS = {
-  tab: v => { S.tab = v; S.add = null; window.scrollTo(0, 0); },
+  tab: v => { S.tab = v; S.add = null; S.recipe = null; S.edit = null; window.scrollTo(0, 0); },
   week: v => { S.week = Math.min(M.weeks.length - 1, Math.max(0, S.week + Number(v))); },
   lock: id => { const m = rows.plan_meals.find(x => x.id === id); persist('plan_meals', id, { locked: !m.locked }); },
   swap: id => {
@@ -147,13 +207,21 @@ const ACTIONS = {
     refresh();
   },
   clear: id => setMeal(id, { recipe_id: null, leftovers: false }, day => `${day} is open again.`),
-  add: id => { S.add = { mealId: id, step: 'menu' }; },
-  addstep: v => { S.add.step = v; S.add.err = ''; },
-  boxpick: id => placeRecipe(id),
+  add: id => { S.add = { target: 'meal', mealId: id, step: 'menu' }; },
+  addstep: v => { Object.assign(S.add, { step: v, err: '' }); if (v !== 'link') Object.assign(S.add, { name: undefined, ing: undefined }); },
+  boxpick: id => { if (S.add.target === 'picks') { S.add = null; addPick(id); } else placeRecipe(id); },
   frompick: id => { const p = rows.picks.find(x => x.id === id); placeRecipe(p.recipe_id); del('picks', id); refresh(); },
-  keep: id => { S.kept[id] = 1; persist('recipes', id, { status: 'box' }); },
-  pass: id => { persist('recipes', id, { status: 'passed' }); },
   filt: v => { S.filt = v; },
+  recipe: id => openRecipe(id),
+  openrecipe: id => openRecipe(id),
+  pickopen: id => { S.pickOpen = S.pickOpen === id ? null : id; },
+  pickto: mealId => {
+    const p = rows.picks.find(x => x.id === S.pickOpen), r = rows.recipes.find(x => x.id === p.recipe_id);
+    del('picks', p.id);
+    S.pickOpen = null;
+    setMeal(mealId, { recipe_id: r.id, leftovers: false }, day => `${r.title} is on ${day}. Its ingredients are on the list.`);
+  },
+  unpick: id => { del('picks', id); S.pickOpen = null; refresh(); S.toast = 'Taken out of the picks. It stays in the recipe box.'; },
   done: id => { const it = rows.list_items.find(x => x.id === id); persist('list_items', id, { checked: !it.checked }); },
   haveit: id => { const it = rows.list_items.find(x => x.id === id); persist('list_items', id, { have_it: !it.have_it, checked: false }); },
   rmitem: id => { del('list_items', id); refresh(); },
@@ -187,19 +255,42 @@ const A = {
   typego: () => {
     const name = (S.add.name || '').trim();
     if (!name) { S.add.err = 'Give the dinner a name first.'; return; }
-    const recipe = add('recipes', {
-      title: name.charAt(0).toUpperCase() + name.slice(1), origin: 'typed', status: 'box', servings: M.hh.portions,
-      tags: [], steps: [], created_at: new Date().toISOString(),
-    });
-    (S.add.ing || '').split('\n').map(l => l.trim()).filter(Boolean).forEach((line, i) => {
-      const n = ingredientName(line);
-      const ing = rows.ingredients.find(x => x.name.toLowerCase() === n.toLowerCase())
-        || add('ingredients', { name: n, pantry_staple: false, aisle: guessAisle(n) });
-      add('recipe_ingredients', { recipe_id: recipe.id, ingredient_id: ing.id, note: line, position: i });
-    });
-    placeRecipe(recipe.id);
+    finishAdd(saveRecipe({ title: name, origin: 'typed', ing: lines(S.add.ing) }), false);
   },
+  linkgo: async () => {
+    const a = S.add, url = (a.url || '').trim();
+    if (!url) { a.err = 'Paste a recipe link first.'; return; }
+    a.step = 'reading'; a.err = ''; render();
+    let pv;
+    try { pv = await data.importRecipe(url); } catch (e) { a.step = 'link'; a.err = e.message; return; }
+    if (S.add !== a) return; // closed while reading
+    pv.dupe = rows.recipes.find(r => r.source_url && r.source_url === pv.source_url)?.id || null;
+    Object.assign(a, { step: 'preview', pv, name: undefined, ing: undefined });
+  },
+  savelink: () => saveLink(false),
+  savepick: () => saveLink(true),
   closeadd: () => { S.add = null; },
+  addpick: () => { S.add = { target: 'picks', step: 'menu' }; },
+  newlink: () => { S.add = { target: 'box', step: 'link', first: 'link' }; },
+  newtype: () => { S.add = { target: 'box', step: 'type', first: 'type' }; },
+  backbox: () => { S.recipe = null; S.edit = null; },
+  topicks: () => addPick(S.recipe),
+  editrecipe: () => { S.edit = editFields(M, M.recipeById.get(S.recipe)); },
+  canceledit: () => { S.edit = null; },
+  saverecipe: () => {
+    const e = S.edit, id = S.recipe;
+    if (!e.title.trim()) { e.err = 'The recipe needs a name.'; return; }
+    persist('recipes', id, {
+      title: e.title.trim(), time_min: toInt(e.time), servings: toInt(e.serves) || M.hh.portions,
+      luke_note: e.luke.trim() || null, steps: lines(e.steps).map(text => ({ text })),
+    });
+    setIngredients(id, lines(e.ing));
+    refresh();
+    resyncRecipe(id);
+    refresh();
+    S.edit = null;
+    S.toast = 'Saved.';
+  },
   additem: () => {
     const label = S.newItem.trim(), wk = M.weeks[S.week];
     if (!label) { S.listErr = 'Type something to add.'; return; }
@@ -218,13 +309,6 @@ const A = {
   },
   pm: () => setHousehold({ portions: Math.max(1, M.hh.portions - 1) }),
   pp: () => setHousehold({ portions: Math.min(12, M.hh.portions + 1) }),
-  imp: () => {
-    const v = S.url.trim();
-    S.impMsg = '';
-    if (!v) { S.impErr = 'Paste a recipe link first'; return; }
-    if (!/^(https?:\/\/)?[\w-]+(\.[\w-]+)+/.test(v)) { S.impErr = 'That doesn’t look like a link'; return; }
-    S.impMsg = 'Importing from links is coming in a later update.';
-  },
   dismiss: () => { S.err = ''; },
   reload: () => { S.err = ''; start(); },
   sample: () => { start(); },
@@ -232,7 +316,7 @@ const A = {
 };
 
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-keep],[data-pass],[data-filt],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-units],[data-a]');
+  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-units],[data-a]');
   if (!el || el.disabled) return;
   if (el.dataset.a === 'closeadd' && el.classList.contains('ov') && e.target.closest('[data-stop]')) return;
   S.toast = '';
@@ -241,25 +325,28 @@ document.addEventListener('click', async e => {
   else if (A[el.dataset.a]) await A[el.dataset.a]();
   if (S.screen !== 'loading') render();
   if (S.add?.step === 'type' && !S.add.name) $('tyname')?.focus();
+  if (S.add?.step === 'link' && !S.add.url) $('linkin')?.focus();
 });
 
-// Keyboard: list items are role="checkbox"; Enter adds a list item.
-document.addEventListener('keydown', e => {
+// Keyboard: list items are role="checkbox"; Enter adds a list item or reads a link.
+document.addEventListener('keydown', async e => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[data-done]')) { e.preventDefault(); e.target.click(); }
   if (e.key === 'Enter' && e.target.id === 'newitem') { e.preventDefault(); A.additem(); render(); $('newitem')?.focus(); }
+  if (e.key === 'Enter' && e.target.id === 'linkin') { e.preventDefault(); await A.linkgo(); render(); }
 });
 
+// Typing is kept in state, so a re-render never loses it.
+const FIELDS = { tyname: ['add', 'name'], tying: ['add', 'ing'], linkin: ['add', 'url'], pvtitle: ['add', 'name'], pving: ['add', 'ing'],
+  'ed-title': ['edit', 'title'], 'ed-time': ['edit', 'time'], 'ed-serves': ['edit', 'serves'], 'ed-luke': ['edit', 'luke'],
+  'ed-ing': ['edit', 'ing'], 'ed-steps': ['edit', 'steps'] };
 document.addEventListener('input', e => {
-  const id = e.target.id;
-  if (id === 'url') { S.url = e.target.value; if (S.impErr) { S.impErr = ''; e.target.closest('.cd').querySelector('.err').textContent = ''; } }
+  const id = e.target.id, f = FIELDS[id];
+  if (f && S[f[0]]) S[f[0]][f[1]] = e.target.value;
   if (id === 'em') S.email = e.target.value;
-  if (id === 'tyname' && S.add) S.add.name = e.target.value;
-  if (id === 'tying' && S.add) S.add.ing = e.target.value;
   if (id === 'newitem') S.newItem = e.target.value;
 });
 
 document.addEventListener('change', e => {
-  if (e.target.id === 'shot' && e.target.files[0]) { S.impErr = ''; S.impMsg = 'Reading recipes from screenshots is coming in a later update.'; render(); }
   if (e.target.id === 'newaisle') S.newAisle = e.target.value;
   if (e.target.id === 'moveaisle') { S.toast = ''; ACTIONS.aisleto(e.target.value); render(); }
 });

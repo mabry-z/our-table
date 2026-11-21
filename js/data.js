@@ -54,6 +54,27 @@ export async function loadRows() {
 // Writes change the local rows right away (synchronously), then save in the background. Saves
 // run one at a time in order, so a recipe is saved before its ingredients and a plan before
 // its nights. Each returns a promise that rejects if its save fails.
+// Reads a recipe from a link (supabase/functions/import-recipe). Sample mode returns a canned
+// recipe so the flow can be tried. Throws an Error with a message we can show.
+export async function importRecipe(url) {
+  if (mode === 'sample') {
+    await new Promise(r => setTimeout(r, 600));
+    if (!/\./.test(url)) throw new Error('That doesn’t look like a link.');
+    const site = url.replace(/^https?:\/\//, '').split('/')[0].replace(/^www\./, '');
+    return {
+      title: 'One pot chili mac', servings: 6, time_min: 35, site, source_url: url,
+      ingredients: ['1 lb ground beef', '1 tbsp chili powder', '1 can diced tomatoes', '2 cups beef broth', '8 oz elbow macaroni', '2 cups shredded cheddar'],
+      steps: [{ text: 'Brown the beef in a large pot.' }, { text: 'Add the spices, tomatoes, broth and pasta; simmer 10 minutes.' }, { text: 'Stir in the cheddar until melted.' }],
+    };
+  }
+  const { data, error } = await (await client()).functions.invoke('import-recipe', { body: { url } });
+  if (error) {
+    const body = await error.context?.json?.().catch(() => null);
+    throw new Error(body?.error || 'Couldn’t reach the recipe reader. Check your connection.');
+  }
+  return data;
+}
+
 // crypto.randomUUID only exists on https and localhost; phones testing over Wi-Fi use plain http.
 function newId() {
   if (crypto.randomUUID) return crypto.randomUUID();

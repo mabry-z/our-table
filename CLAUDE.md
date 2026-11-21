@@ -50,8 +50,14 @@ Recipes and recipe pages (hidden when AI suggestions are off).
   have "Add dinner". Lock, move, skip, replace via the ⋯ menu; freshness check before moving a
   perishable dinner past its "cook by" day. Each dinner shows its source (site, from a photo, typed
   in, from your box, new idea).
-- **Recipes:** recipe box with All, Quick, Luke-friendly and New filters; + for link or screenshot
-  import. Ask finds recipes on our sites, creates new ones, or reads a fridge photo.
+- **Recipes:** recipe box with All, Quick and Luke-friendly filters; "Paste a link" and "Type one
+  in" at the top (screenshots come in phase 3). Tapping a recipe (here or a dinner on Plan) opens
+  its page: ingredients, steps, source link, "Add to this week's picks" and Edit. Ask finds recipes
+  on our sites, creates new ones, or reads a fridge photo (phase 4).
+- **Link import:** `supabase/functions/import-recipe` fetches the page and reads its schema.org
+  Recipe data (parser in `parse.js`, shared with browser tests). Signed-in household members only;
+  public http(s) pages only (no IPs, private names or odd ports; redirects checked hop by hop).
+  The app shows a check-it-over card before saving; a link already in the box is reused.
 - **Recipe page and cook mode:** ingredients scaled by a portions control, steps, source link.
   "Start cooking" = one step per screen, large type, that step's ingredients, one-tap timers, screen
   kept awake (Wake Lock API), Luke reminder at the right step, rating at the end ("Make again" / "Not

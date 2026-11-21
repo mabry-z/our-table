@@ -164,9 +164,13 @@ the non-AI pieces come first so the app is useful sooner, and the finished app m
 
 1. **Foundation.** Done: Supabase project, tables, sign-in for both of us, four tabs styled like the
    mockups with sample data, week arrows on Plan.
-2. **Build a week by hand.** Schema changes above; recipe box with add and edit; link import (recipe
-   data on the page); Add dinner sheet (box, link, type); This week's picks shared between us; recipe
-   page (read-only); list by aisle with editing; Luke's usuals on every list.
+2. **Build a week by hand.** Built Nov 21, 2026: schema changes above; recipe box with add and edit
+   (recipe page with Edit for name, time, serves, Luke note, ingredients and steps); link import
+   through the `import-recipe` edge function (recipe data on the page, signed-in members only,
+   public pages only, no AI); Add sheet for a night, the picks or the recipe box (picks, box, link,
+   type, leftovers); This week's picks tray on Plan, shared between us; list by aisle (17 aisles)
+   with "have it", our own items and a remembered aisle change; Luke's usuals on every list.
+   A page without recipe data says so; the Claude fallback for those comes in phase 3.
    - Done when: we plan and shop a real week from the app without any AI.
 3. **Find, photos and the AI groundwork.** Edge function with the AI key, usage log and monthly
    limit; Find a recipe (search our list of sites, read the results with the phase 2 link importer)
@@ -192,6 +196,7 @@ flyer work.
 | Risk | Impact | Fallback |
 | --- | --- | --- |
 | A site has no recipe data on the page | Link import fails | Claude reads the page; or screenshot it |
+| A site blocks automated readers (Nov 21 test: Allrecipes, Serious Eats and Simply Recipes answered 403; BBC Good Food and King Arthur worked) | Link import says the site refused | Screenshot it (phase 3); revisit those sites in "Sites we like" before building Find |
 | Photo misread (amounts, handwriting) | Wrong list | Check-it-over card with flagged items before saving |
 | AI recipes untested | A dud dinner | Labeled "Created for you"; ratings teach the planner |
 | AI costs creep | Surprise bill | Usage log and a hard monthly limit |
