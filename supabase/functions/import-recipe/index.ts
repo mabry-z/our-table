@@ -9,8 +9,22 @@
 // Only signed-in members of a household may call it, and it only fetches public web pages
 // (no private addresses, no unusual ports), so it can't be used to reach anything internal.
 
-import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import { parseRecipe } from "./parse.js";
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const API_KEY = Deno.env.get("SUPABASE_ANON_KEY")!; // the project's publishable key
+
+// Asks Supabase directly, as the caller, who they are and whether they belong to a household.
+// (supabase-js getUser sent the caller's token twice in this setup and Supabase rejected it.)
+async function householdMember(authorization: string): Promise<"ok" | "signed out" | "no household"> {
+  if (!authorization) return "signed out";
+  const headers = { apikey: API_KEY, authorization };
+  const me = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers });
+  if (!me.ok) return "signed out";
+  const user = await me.json();
+  const rows = await fetch(`${SUPABASE_URL}/rest/v1/members?select=household_id&user_id=eq.${encodeURIComponent(user.id)}&limit=1`, { headers });
+  return rows.ok && (await rows.json()).length ? "ok" : "no household";
+}
 
 const USER_AGENT = "Mozilla/5.0 (compatible; OurTable/0.1; private household meal planner)";
 const MAX_BYTES = 3_000_000;
@@ -69,13 +83,9 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Use POST." }, 405);
 
   // Signed in, and a member of a household.
-  const db = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, {
-    global: { headers: { authorization: req.headers.get("authorization") ?? "" } },
-  });
-  const { data: { user } } = await db.auth.getUser();
-  if (!user) return json({ error: "Sign in first." }, 401);
-  const { data: member } = await db.from("members").select("household_id").eq("user_id", user.id).limit(1).maybeSingle();
-  if (!member) return json({ error: "Your account isn't part of a household." }, 403);
+  const who = await householdMember(req.headers.get("authorization") ?? "");
+  if (who === "signed out") return json({ error: "Sign in first." }, 401);
+  if (who === "no household") return json({ error: "Your account isn't part of a household." }, 403);
 
   let url: URL;
   try {
