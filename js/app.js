@@ -7,12 +7,15 @@ import { vRecipes, editFields } from './views/recipes.js';
 import { vList } from './views/list.js';
 import { vSettings } from './views/settings.js';
 import { vSignin, vNoHousehold } from './views/signin.js';
+import { shrinkImage } from './photos.js';
 
 const S = {
   screen: 'loading', // loading | signin | nohousehold | app | error
   tab: 'plan', week: 0, filt: 'All',
   add: null,         // Add sheet (see vAddSheet): { target, mealId, step, name, ing, url, pv, err }
-  recipe: null, edit: null, pickOpen: null,
+  recipe: null, edit: null, pickOpen: null, aiSpent: null,
+  pendingDel: null, swiped: null,   // recipe waiting out its Undo; recipe row swiped open
+  page: null, newUsual: { label: '', qty: '' }, newSkip: '', setErr: '', // Settings sub-pages
   toast: '', newItem: '', newAisle: '', listErr: '', moveItem: null,
   email: '', signErr: '', busy: false, err: '', user: null,
 };
@@ -59,6 +62,18 @@ function add(table, row) {
 function del(table, id) { bg(data.remove(table, id)); }
 
 function setHousehold(patch) { persist('households', M.hh.id, patch); }
+
+// Leftovers nights and cooked dinners always add up to 7.
+function setLeftovers(n) {
+  const lo = Math.max(0, Math.min(4, n));
+  setHousehold({ leftovers_per_week: lo, dinners_per_week: 7 - lo });
+}
+
+// This week and next follow changes to Luke's usuals; past weeks stay as they were.
+function syncComing() {
+  M.weeks.filter(w => w.id && !w.past).forEach(w => syncList(w.id));
+  refresh();
+}
 
 // Makes a week's list match its dinners plus Luke's usuals: one line per ingredient, naming the
 // nights it's for. Our own items, checks and "have it" are kept.
@@ -161,10 +176,28 @@ function finishAdd(recipe, toPicks) {
 function saveLink(toPicks) {
   const a = S.add, p = a.pv;
   const recipe = p.dupe ? rows.recipes.find(r => r.id === p.dupe) : saveRecipe({
-    title: (a.name ?? p.title).trim() || p.title, origin: 'link', source_url: p.source_url, site: p.site,
+    title: (a.name ?? p.title).trim() || p.title, origin: p.origin || 'link', source_url: p.source_url, site: p.site,
     time_min: p.time_min, servings: p.servings, steps: p.steps || [], ing: lines(a.ing ?? p.ingredients.join('\n')),
   });
   finishAdd(recipe, toPicks);
+}
+
+// Shows "reading…", runs the reader (link, pasted text or photo), then the check-it-over card.
+async function readRecipe(a, from, read, origin) {
+  Object.assign(a, { step: 'reading', from, err: '' });
+  render();
+  let pv;
+  try { pv = await read(); } catch (e) { Object.assign(a, { step: from, err: e.message }); return; }
+  if (S.add !== a) return; // closed while reading
+  pv.origin = origin;
+  pv.dupe = pv.source_url ? rows.recipes.find(r => r.source_url && r.source_url === pv.source_url)?.id || null : null;
+  Object.assign(a, { step: 'preview', pv, name: undefined, ing: undefined });
+  S.aiSpent = null; // refetched next time Settings opens
+}
+
+async function loadSpent() {
+  try { S.aiSpent = await data.aiSpent(); } catch (e) { console.error(e); S.aiSpent = { error: true }; }
+  if (S.tab === 'settings') render();
 }
 
 // Planned weeks that use a recipe get their lists redone when the recipe changes.
@@ -174,6 +207,33 @@ function resyncRecipe(recipeId) {
 }
 
 function openRecipe(id) { S.tab = 'recipes'; S.recipe = id; S.edit = null; S.add = null; window.scrollTo(0, 0); }
+
+// Deleting waits a few seconds so Undo can bring it back; then the recipe goes for good.
+// Its ingredients and picks go with it (the database cascades); nights that used it open up
+// and their shopping lists follow.
+const UNDO_MS = 6000;
+let delTimer = null;
+function deleteRecipe(id) {
+  finishDelete();
+  const r = rows.recipes.find(x => x.id === id);
+  S.pendingDel = { id, title: r.title };
+  S.recipe = null; S.edit = null; S.swiped = null;
+  delTimer = setTimeout(() => { finishDelete(); render(); }, UNDO_MS);
+}
+function finishDelete() {
+  clearTimeout(delTimer);
+  const p = S.pendingDel;
+  if (!p) return;
+  S.pendingDel = null;
+  const plans = new Set();
+  rows.plan_meals.filter(m => m.recipe_id === p.id).forEach(m => { m.recipe_id = null; m.options = []; m.locked = false; plans.add(m.plan_id); });
+  rows.picks = rows.picks.filter(x => x.recipe_id !== p.id);
+  rows.recipe_ingredients = rows.recipe_ingredients.filter(x => x.recipe_id !== p.id);
+  del('recipes', p.id);
+  refresh();
+  plans.forEach(id => { if (!M.weeks.find(w => w.id === id)?.past) syncList(id); });
+  refresh();
+}
 
 async function start() {
   S.screen = 'loading'; render();
@@ -196,7 +256,15 @@ async function start() {
 }
 
 const ACTIONS = {
-  tab: v => { S.tab = v; S.add = null; S.recipe = null; S.edit = null; window.scrollTo(0, 0); },
+  tab: v => { S.tab = v; S.add = null; S.recipe = null; S.edit = null; S.page = null; S.swiped = null; window.scrollTo(0, 0); if (v === 'settings') loadSpent(); },
+  rmphoto: i => { S.add.photos.splice(Number(i), 1); },
+  delrecipe: id => deleteRecipe(id),
+  rmusual: id => {
+    const u = rows.usuals.find(x => x.id === id);
+    del('usuals', id); refresh(); syncComing();
+    S.toast = `${u.label} is off Luke's usuals.`;
+  },
+  rmskip: i => setHousehold({ foods_we_skip: (M.hh.foods_we_skip || []).filter((_, j) => j !== Number(i)) }),
   week: v => { S.week = Math.min(M.weeks.length - 1, Math.max(0, S.week + Number(v))); },
   lock: id => { const m = rows.plan_meals.find(x => x.id === id); persist('plan_meals', id, { locked: !m.locked }); },
   swap: id => {
@@ -260,20 +328,54 @@ const A = {
   linkgo: async () => {
     const a = S.add, url = (a.url || '').trim();
     if (!url) { a.err = 'Paste a recipe link first.'; return; }
-    a.step = 'reading'; a.err = ''; render();
-    let pv;
-    try { pv = await data.importRecipe(url); } catch (e) { a.step = 'link'; a.err = e.message; return; }
-    if (S.add !== a) return; // closed while reading
-    pv.dupe = rows.recipes.find(r => r.source_url && r.source_url === pv.source_url)?.id || null;
-    Object.assign(a, { step: 'preview', pv, name: undefined, ing: undefined });
+    await readRecipe(a, 'link', () => data.importRecipe(url), 'link');
+  },
+  textgo: async () => {
+    const a = S.add, text = (a.text || '').trim(), url = (a.url || '').trim();
+    if (text.length < 20) { a.err = 'Paste the recipe text first.'; return; }
+    await readRecipe(a, 'text', () => data.aiRecipe({ kind: 'text', text, url }), url ? 'link' : 'typed');
+  },
+  photogo: async () => {
+    const a = S.add;
+    if (!a.photos?.length) { a.err = 'Choose a photo first.'; return; }
+    await readRecipe(a, 'photo', () => data.aiRecipe({ kind: 'photo', images: a.photos.map(({ media_type, data: d }) => ({ media_type, data: d })) }), 'photo');
   },
   savelink: () => saveLink(false),
   savepick: () => saveLink(true),
   closeadd: () => { S.add = null; },
   addpick: () => { S.add = { target: 'picks', step: 'menu' }; },
-  newlink: () => { S.add = { target: 'box', step: 'link', first: 'link' }; },
-  newtype: () => { S.add = { target: 'box', step: 'type', first: 'type' }; },
+  newrecipe: () => { S.add = { target: 'box', step: 'menu' }; },
+  lm: () => setHousehold({ ai_monthly_limit: Math.max(0, Number(M.hh.ai_monthly_limit ?? 10) - 5) }),
+  lp: () => setHousehold({ ai_monthly_limit: Math.min(100, Number(M.hh.ai_monthly_limit ?? 10) + 5) }),
   backbox: () => { S.recipe = null; S.edit = null; },
+  tm: () => setHousehold({ time_limit_min: Math.max(10, Number(M.hh.time_limit_min) - 5) }),
+  tp: () => setHousehold({ time_limit_min: Math.min(240, Number(M.hh.time_limit_min) + 5) }),
+  lom: () => setLeftovers(M.hh.leftovers_per_week - 1),
+  lop: () => setLeftovers(M.hh.leftovers_per_week + 1),
+  openusuals: () => { S.page = 'usuals'; S.setErr = ''; window.scrollTo(0, 0); },
+  openskip: () => { S.page = 'skip'; S.setErr = ''; window.scrollTo(0, 0); },
+  closepage: () => { S.page = null; S.setErr = ''; },
+  addusual: () => {
+    const label = S.newUsual.label.trim(), qty = S.newUsual.qty.trim();
+    if (!label) { S.setErr = 'Type what to add.'; return; }
+    const name = label.charAt(0).toUpperCase() + label.slice(1);
+    const ing = rows.ingredients.find(x => x.name.toLowerCase() === label.toLowerCase())
+      || add('ingredients', { name, pantry_staple: false, aisle: guessAisle(label) });
+    if (rows.usuals.some(u => u.ingredient_id === ing.id)) { S.setErr = `${name} is already one of Luke's usuals.`; return; }
+    add('usuals', { ingredient_id: ing.id, label: name, quantity_label: qty || null, skip_this_week: false,
+      position: Math.max(-1, ...rows.usuals.map(u => u.position)) + 1 });
+    S.newUsual = { label: '', qty: '' }; S.setErr = '';
+    refresh(); syncComing();
+    S.toast = `${name} is on every list now.`;
+  },
+  addskip: () => {
+    const f = S.newSkip.trim(), list = M.hh.foods_we_skip || [];
+    if (!f) { S.setErr = 'Type a food first.'; return; }
+    if (list.some(x => x.toLowerCase() === f.toLowerCase())) { S.setErr = 'That one is already on the list.'; return; }
+    setHousehold({ foods_we_skip: [...list, f.charAt(0).toUpperCase() + f.slice(1)] });
+    S.newSkip = ''; S.setErr = '';
+  },
+  undodel: () => { clearTimeout(delTimer); S.toast = `${S.pendingDel.title} is back.`; S.pendingDel = null; },
   topicks: () => addPick(S.recipe),
   editrecipe: () => { S.edit = editFields(M, M.recipeById.get(S.recipe)); },
   canceledit: () => { S.edit = null; },
@@ -315,10 +417,45 @@ const A = {
   signout: async () => { await data.signOut(); rows = M = null; S.user = null; S.screen = 'signin'; S.tab = 'plan'; },
 };
 
+// Swiping a recipe row left past halfway leaves it open on Delete; vertical moves scroll.
+const SWIPE = 96;
+let drag = null, justSwiped = false;
+document.addEventListener('pointerdown', e => {
+  const f = e.target.closest('.swipe-front');
+  if (f) drag = { f, id: f.dataset.recipe, x: e.clientX, y: e.clientY, base: S.swiped === f.dataset.recipe ? -SWIPE : 0, dx: 0, moved: false };
+});
+document.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (!drag.moved) {
+    if (Math.abs(dx) < 8) return;
+    if (Math.abs(dy) > Math.abs(dx)) { drag = null; return; }
+    drag.moved = true;
+    drag.f.classList.add('dragging');
+  }
+  drag.dx = dx;
+  drag.f.style.transform = `translateX(${Math.max(-SWIPE - 24, Math.min(0, drag.base + dx))}px)`;
+});
+function endSwipe() {
+  const d = drag;
+  drag = null;
+  if (!d?.moved) return;
+  justSwiped = true;
+  setTimeout(() => { justSwiped = false; }, 300);
+  d.f.classList.remove('dragging');
+  d.f.style.transform = '';
+  S.swiped = d.base + d.dx < -SWIPE / 2 ? d.id : null;
+  render();
+}
+document.addEventListener('pointerup', endSwipe);
+document.addEventListener('pointercancel', endSwipe);
+
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-units],[data-a]');
+  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-rmphoto],[data-delrecipe],[data-rmusual],[data-rmskip],[data-units],[data-a]');
   if (!el || el.disabled) return;
   if (el.dataset.a === 'closeadd' && el.classList.contains('ov') && e.target.closest('[data-stop]')) return;
+  if (justSwiped) return;                                          // the end of a swipe isn't a tap
+  if (S.swiped && el.dataset.recipe) { S.swiped = null; render(); return; } // a tap closes an open row
   S.toast = '';
   const key = Object.keys(el.dataset).find(k => k in ACTIONS);
   if (key) ACTIONS[key](el.dataset[key]);
@@ -333,20 +470,30 @@ document.addEventListener('keydown', async e => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[data-done]')) { e.preventDefault(); e.target.click(); }
   if (e.key === 'Enter' && e.target.id === 'newitem') { e.preventDefault(); A.additem(); render(); $('newitem')?.focus(); }
   if (e.key === 'Enter' && e.target.id === 'linkin') { e.preventDefault(); await A.linkgo(); render(); }
+  if (e.key === 'Enter' && (e.target.id === 'us-qty' || e.target.id === 'us-label')) { e.preventDefault(); A.addusual(); render(); $('us-label')?.focus(); }
+  if (e.key === 'Enter' && e.target.id === 'skip-in') { e.preventDefault(); A.addskip(); render(); $('skip-in')?.focus(); }
 });
 
 // Typing is kept in state, so a re-render never loses it.
 const FIELDS = { tyname: ['add', 'name'], tying: ['add', 'ing'], linkin: ['add', 'url'], pvtitle: ['add', 'name'], pving: ['add', 'ing'],
+  pastetext: ['add', 'text'], pasteurl: ['add', 'url'],
   'ed-title': ['edit', 'title'], 'ed-time': ['edit', 'time'], 'ed-serves': ['edit', 'serves'], 'ed-luke': ['edit', 'luke'],
-  'ed-ing': ['edit', 'ing'], 'ed-steps': ['edit', 'steps'] };
+  'ed-ing': ['edit', 'ing'], 'ed-steps': ['edit', 'steps'], 'us-label': ['newUsual', 'label'], 'us-qty': ['newUsual', 'qty'] };
 document.addEventListener('input', e => {
   const id = e.target.id, f = FIELDS[id];
   if (f && S[f[0]]) S[f[0]][f[1]] = e.target.value;
   if (id === 'em') S.email = e.target.value;
   if (id === 'newitem') S.newItem = e.target.value;
+  if (id === 'skip-in') S.newSkip = e.target.value;
 });
 
-document.addEventListener('change', e => {
+document.addEventListener('change', async e => {
+  if (e.target.id === 'photoin' && S.add) {
+    const a = S.add, files = [...e.target.files].slice(0, 4 - (a.photos?.length || 0));
+    a.err = '';
+    try { for (const f of files) (a.photos ||= []).push(await shrinkImage(f)); } catch (err) { a.err = err.message; }
+    render();
+  }
   if (e.target.id === 'newaisle') S.newAisle = e.target.value;
   if (e.target.id === 'moveaisle') { S.toast = ''; ACTIONS.aisleto(e.target.value); render(); }
 });

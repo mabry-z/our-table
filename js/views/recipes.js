@@ -15,18 +15,23 @@ export function vRecipes(S, M) {
 
 function vBox(S, M) {
   let h = head('Our recipe box', 'Recipes');
-  if (S.toast) h += `<div class="toast">${icon('check')}<span style="flex:1">${esc(S.toast)}</span></div>`;
-  h += `<div style="display:flex;gap:8px;margin-bottom:14px"><button class="ib" data-a="newlink" style="flex:1;justify-content:center;padding:9px">${icon('link')} Paste a link</button>`
-    + `<button class="ib" data-a="newtype" style="flex:1;justify-content:center;padding:9px">${icon('pencil')} Type one in</button></div>`;
-  const box = M.recipes.filter(x => x.status === 'box').sort((a, b) => a.title.localeCompare(b.title));
-  const shown = box.filter(x => S.filt === 'All' || (S.filt === 'Quick' ? (x.tags || []).includes('Quick') || (x.time_min && x.time_min <= 30) : (x.tags || []).includes(S.filt) || (S.filt === 'Luke-friendly' && x.luke_note)));
+  if (S.pendingDel) h += `<div class="toast"><span style="flex:1">${esc(S.pendingDel.title)} deleted.</span><button class="ib" data-a="undodel" style="border-color:#B7C2A6;color:#3F4D30">Undo</button></div>`;
+  else if (S.toast) h += `<div class="toast">${icon('check')}<span style="flex:1">${esc(S.toast)}</span></div>`;
+  h += `<button class="ib dk" data-a="newrecipe" style="width:100%;justify-content:center;padding:10px;margin-bottom:14px;font-size:14px">${icon('plus')} Add a recipe</button>`;
+  const box = M.recipes.filter(x => x.status === 'box' && x.id !== S.pendingDel?.id).sort((a, b) => a.title.localeCompare(b.title));
+  const quick = Number(M.hh.time_limit_min) || 30;
+  const shown = box.filter(x => S.filt === 'All' || (S.filt === 'Quick' ? (x.tags || []).includes('Quick') || (x.time_min && x.time_min <= quick) : (x.tags || []).includes(S.filt) || (S.filt === 'Luke-friendly' && x.luke_note)));
   h += `<div class="row" style="margin:4px 2px 10px"><div class="sf dsp" style="font-size:22px">Recipe box</div><span class="mu">${box.length} saved</span></div>`
-    + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${FILTERS.map(x => `<button class="ib ${S.filt === x ? 'dk' : ''}" data-filt="${x}">${x}</button>`).join('')}</div>`;
+    + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">${FILTERS.map(x => `<button class="ib ${S.filt === x ? 'dk' : ''}" data-filt="${x}">${x === 'Quick' ? `Quick · ${quick} min or less` : x}</button>`).join('')}</div>`;
   const count = id => M.recipeIngredients.filter(ri => ri.recipe_id === id).length;
-  h += `<div class="cd" style="padding:4px 14px">` + (shown.length ? shown.map((x, j) =>
-    `<button class="rrow" data-recipe="${x.id}" style="${j ? 'border-top:1px solid var(--rule2)' : ''}"><span style="flex:1"><span class="sf" style="font-size:16px;line-height:1.25;display:block">${esc(x.title)}</span>`
-    + `<span class="mu">${[x.time_min ? x.time_min + ' min' : '', count(x.id) ? count(x.id) + ' ingredients' : 'No ingredients yet', x.rating ? stars(x.rating) : ''].filter(Boolean).join(' · ')}</span></span>${icon('chevron-right')}</button>`).join('')
-    : `<div class="mu" style="padding:10px 0">Nothing here yet.</div>`) + `</div>`;
+  // Each row slides left to show Delete (see the swipe handling in app.js).
+  h += `<div class="cd" style="padding:0;overflow:hidden">` + (shown.length ? shown.map((x, j) =>
+    `<div class="swipe${S.swiped === x.id ? ' open' : ''}" style="${j ? 'border-top:1px solid var(--rule2)' : ''}">`
+    + `<button class="swipe-del" data-delrecipe="${x.id}" tabindex="${S.swiped === x.id ? 0 : -1}">${icon('trash')} Delete</button>`
+    + `<button class="rrow swipe-front" data-recipe="${x.id}"><span style="flex:1"><span class="sf" style="font-size:16px;line-height:1.25;display:block">${esc(x.title)}</span>`
+    + `<span class="mu">${[x.time_min ? x.time_min + ' min' : '', count(x.id) ? count(x.id) + ' ingredients' : 'No ingredients yet', x.rating ? stars(x.rating) : ''].filter(Boolean).join(' · ')}</span></span>${icon('chevron-right')}</button></div>`).join('')
+    : `<div class="mu" style="padding:10px 14px">Nothing here yet.</div>`) + `</div>`;
+  if (shown.length) h += `<div class="mu" style="text-align:center;margin-top:-2px">Swipe a recipe left to delete it.</div>`;
   return h;
 }
 
@@ -48,6 +53,9 @@ function vRecipe(S, M, r) {
       : `<div class="mu">No ingredients yet. Tap Edit to add them, so this dinner fills the shopping list.</div>`) + `</div>`;
   h += `<div class="cd"><div class="ey" style="margin-bottom:6px">Steps</div>`
     + (steps.length ? `<ol class="ul">${steps.map(s => `<li>${esc(stepText(s))}</li>`).join('')}</ol>` : `<div class="mu">No steps saved.</div>`) + `</div>`;
+  const planned = M.weeks.some(w => !w.past && w.meals.some(m => m.recipe_id === r.id));
+  h += `<button class="ib" data-delrecipe="${r.id}" style="display:flex;margin:18px auto 4px;border-color:#E7CDBD;color:#A3412E">${icon('trash')} Delete recipe</button>`
+    + (planned ? `<div class="mu" style="text-align:center">It's planned for a night; that night will open up again.</div>` : '');
   return h;
 }
 

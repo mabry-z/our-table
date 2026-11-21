@@ -58,6 +58,13 @@ Recipes and recipe pages (hidden when AI suggestions are off).
   Recipe data (parser in `parse.js`, shared with browser tests). Signed-in household members only;
   public http(s) pages only (no IPs, private names or odd ports; redirects checked hop by hop).
   The app shows a check-it-over card before saving; a link already in the box is reused.
+- **AI helper:** `supabase/functions/ai` reads pasted recipe text (kind "text", for sites like
+  Allrecipes that block the link reader) and screenshots or photos (kind "photo", up to 4, shrunk
+  to 1600px JPEG in the browser by `js/photos.js`) with Claude Sonnet 5.5, structured output,
+  `fallbacks: "default"`. Every call is logged in `ai_requests` (service key) and refused once the
+  month's spending reaches `households.ai_monthly_limit` (Settings, $5 steps). Check callers with
+  direct fetches to `/auth/v1/user`, not supabase-js `getUser` (it fails with this project's
+  publishable key).
 - **Recipe page and cook mode:** ingredients scaled by a portions control, steps, source link.
   "Start cooking" = one step per screen, large type, that step's ingredients, one-tap timers, screen
   kept awake (Wake Lock API), Luke reminder at the right step, rating at the end ("Make again" / "Not

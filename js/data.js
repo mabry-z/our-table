@@ -75,6 +75,40 @@ export async function importRecipe(url) {
   return data;
 }
 
+// Reads a recipe with Claude (supabase/functions/ai): { kind: 'text', text, url } or
+// { kind: 'photo', images: [{ media_type, data }] }. Sample mode returns a canned recipe.
+export async function aiRecipe(req) {
+  if (mode === 'sample') {
+    await new Promise(r => setTimeout(r, 900));
+    const photo = req.kind === 'photo';
+    return {
+      title: photo ? "Grandma's chicken and dumplings" : 'World’s best lasagna', servings: photo ? 6 : 12, time_min: photo ? 75 : 195,
+      ingredients: photo
+        ? ['1 whole chicken, cut up', '3 carrots, sliced', '3 celery stalks', '1 onion, diced', '2 cups flour', '1 tbsp baking powder', '¾ cup milk', '1 can chicken broth']
+        : ['1 lb sweet Italian sausage', '¾ lb lean ground beef', '1 onion, minced', '1 (28 oz) can crushed tomatoes', '12 lasagna noodles', '16 oz ricotta cheese', '¾ lb mozzarella, sliced'],
+      steps: [{ text: 'Brown the meat with the onion.' }, { text: 'Simmer the sauce.' }, { text: 'Layer and bake.' }],
+      unclear: photo ? ['The card says "1 can" of broth; read as 14 oz.'] : [],
+      site: req.url ? req.url.replace(/^https?:\/\//, '').split('/')[0].replace(/^www\./, '') : null,
+      source_url: req.url || null, cost_usd: photo ? 0.021 : 0.012,
+    };
+  }
+  const { data, error } = await (await client()).functions.invoke('ai', { body: req });
+  if (error) {
+    const body = await error.context?.json?.().catch(() => null);
+    throw new Error(body?.error || 'Couldn’t reach the AI helper. Check your connection.');
+  }
+  return data;
+}
+
+// This month's AI spending for the household (the log is read-only from the app).
+export async function aiSpent() {
+  const start = new Date(); start.setUTCDate(1); start.setUTCHours(0, 0, 0, 0);
+  if (mode === 'sample') return { usd: 0.47, count: 18 };
+  const { data, error } = await (await client()).from('ai_requests').select('cost_usd').gte('created_at', start.toISOString());
+  if (error) throw error;
+  return { usd: data.reduce((a, r) => a + Number(r.cost_usd), 0), count: data.length };
+}
+
 // crypto.randomUUID only exists on https and localhost; phones testing over Wi-Fi use plain http.
 function newId() {
   if (crypto.randomUUID) return crypto.randomUUID();

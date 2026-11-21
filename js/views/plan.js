@@ -81,9 +81,25 @@ export function vAddSheet(S, M) {
     }
     if (a.target !== 'box') b += opt('data-addstep="box"', 'book', 'From our recipe box', 'Pick something we already have');
     b += opt('data-addstep="link"', 'link', 'Paste a link', 'From a recipe site; its ingredients come too')
+      + opt('data-addstep="text"', 'clipboard-text', 'Paste the recipe text', 'For sites that block links, like Allrecipes · about 1¢')
+      + opt('data-addstep="photo"', 'photo', 'Screenshot or photo', 'A web page, cookbook page or recipe card · about 2¢')
       + opt('data-addstep="type"', 'pencil', 'Type it', 'Just a name, plus ingredients if you want them on the list')
       + (a.target === 'meal' && !meal.leftovers ? opt('data-a="leftovers"', 'bowl', 'Leftovers night', 'No cooking; nothing added to the list') : '')
-      + `<div class="mu" style="margin:10px 2px 0">Find and photos are coming in the next phase.</div>`;
+      + `<div class="mu" style="margin:10px 2px 0">Find is coming next.</div>`;
+  }
+  if (a.step === 'text') {
+    b += `<div class="mu" style="margin:0 2px 8px">On the recipe page, select from the title down through the steps, copy, and paste here. Claude sorts out the ingredients and steps.</div>`
+      + `<label class="lbl" for="pastetext">Recipe text</label><textarea class="fld" id="pastetext" rows="8" placeholder="Paste the recipe here">${esc(a.text || '')}</textarea>`
+      + `<label class="lbl" for="pasteurl">Link to the original, optional</label><input class="in" id="pasteurl" type="url" inputmode="url" autocomplete="off" placeholder="allrecipes.com/recipe/…" value="${esc(a.url || '')}">`
+      + `<div class="err">${esc(a.err || '')}</div><button class="big dk" data-a="textgo">Read it</button>`;
+  }
+  if (a.step === 'photo') {
+    const ph = a.photos || [];
+    b += `<div class="mu" style="margin:0 2px 8px">Screenshots of a recipe page, a cookbook page, or a recipe card. Up to 4 pictures of one recipe, for example ingredients and steps.</div>`
+      + (ph.length ? `<div class="thumbs">${ph.map((p, i) => `<div class="thumb"><img src="${p.preview}" alt="Picture ${i + 1}"><button class="ib" data-rmphoto="${i}" aria-label="Remove picture ${i + 1}">${icon('x')}</button></div>`).join('')}</div>` : '')
+      + (ph.length < 4 ? `<label class="opt" style="cursor:pointer">${icon('photo-plus')}<span style="flex:1">${ph.length ? 'Add another picture' : 'Choose a screenshot or photo'}</span><input type="file" id="photoin" accept="image/*" multiple style="display:none"></label>` : '')
+      + `<div class="err">${esc(a.err || '')}</div>`
+      + (ph.length ? `<button class="big dk" data-a="photogo">Read ${ph.length > 1 ? 'them' : 'it'}</button>` : '');
   }
   if (a.step === 'box') {
     const box = M.recipes.filter(r => r.status === 'box').sort((x, y) => x.title.localeCompare(y.title));
@@ -96,14 +112,16 @@ export function vAddSheet(S, M) {
       + `<div class="err">${esc(a.err || '')}</div>`
       + `<div class="mu" style="margin-top:6px">Works with most recipe sites. You'll get to check it before it's saved.</div>`;
   }
-  if (a.step === 'reading') b += `<div class="cd" style="text-align:center"><div class="sf" style="font-size:18px">Reading the recipe…</div><div class="mu">${esc(a.url || '')}</div></div>`;
+  if (a.step === 'reading') b += `<div class="cd" style="text-align:center"><div class="sf" style="font-size:18px">${a.from === 'link' ? 'Reading the recipe…' : 'Claude is reading it…'}</div><div class="mu">${a.from === 'link' ? esc(a.url || '') : 'This takes a few seconds.'}</div></div>`;
   if (a.step === 'preview') {
     const p = a.pv;
     b += `<div class="mu" style="margin:0 2px 8px">Check it over. You can fix anything before it's saved.</div>`
-      + `<div class="ey">${esc(p.site || '')}${p.time_min ? ' · ' + p.time_min + ' min' : ''}${p.servings ? ' · serves ' + p.servings : ''}${p.steps?.length ? ' · ' + p.steps.length + ' steps' : ''}</div>`
+      + `<div class="ey">${[esc(p.site || (p.origin === 'photo' ? 'From your photo' : '')), p.time_min ? p.time_min + ' min' : '', p.servings ? 'serves ' + p.servings : '', p.steps?.length ? p.steps.length + ' steps' : ''].filter(Boolean).join(' · ')}</div>`
       + `<label class="lbl" for="pvtitle">Name</label><input class="in" id="pvtitle" value="${esc(a.name ?? p.title)}" autocomplete="off">`
       + `<label class="lbl" for="pving">Ingredients · they go on the list</label><textarea class="fld" id="pving" rows="${Math.min(10, Math.max(3, p.ingredients.length))}">${esc(a.ing ?? p.ingredients.join('\n'))}</textarea>`
+      + (p.unclear?.length ? p.unclear.map(u => `<div class="banner" style="margin:8px 0 0">${icon('alert-circle')} ${esc(u)}</div>`).join('') : '')
       + (p.dupe ? `<div class="mu" style="margin-top:6px">${icon('info-circle')} This recipe is already in the box; it'll be used, not copied.</div>` : '')
+      + (p.cost_usd != null ? `<div class="mu" style="margin-top:6px">Read by Claude · about ${Math.max(1, Math.round(p.cost_usd * 100))}¢</div>` : '')
       + `<div class="err">${esc(a.err || '')}</div>`
       + (a.target === 'meal'
         ? `<div style="display:flex;gap:8px;margin-top:10px"><button class="ib" data-a="savepick" style="flex:1;justify-content:center;padding:10px">Save to picks instead</button><button class="ib dk" data-a="savelink" style="flex:1;justify-content:center;padding:10px">${done}</button></div>`
@@ -118,7 +136,7 @@ export function vAddSheet(S, M) {
   }
   const back = !['menu', 'reading'].includes(a.step) && !(a.target === 'box' && a.step === a.first);
   return `<div class="ov" data-a="closeadd"><div class="sh" data-stop="1" role="dialog" aria-label="${title}"><div class="grab"></div>`
-    + `<div class="row" style="margin-bottom:10px"><div class="row" style="gap:2px">${back ? `<button class="ib" data-addstep="${a.step === 'preview' ? 'link' : 'menu'}" aria-label="Back" style="border:none;padding:4px">${icon('chevron-left')}</button>` : ''}<div class="sf dsp" style="font-size:22px">${title}</div></div>`
+    + `<div class="row" style="margin-bottom:10px"><div class="row" style="gap:2px">${back ? `<button class="ib" data-addstep="${a.step === 'preview' ? a.from || 'link' : 'menu'}" aria-label="Back" style="border:none;padding:4px">${icon('chevron-left')}</button>` : ''}<div class="sf dsp" style="font-size:22px">${title}</div></div>`
     + `<button class="ib" data-a="closeadd" aria-label="Close" style="border:none">${icon('x')}</button></div>`
     + `<div class="shb">${b}</div></div></div>`;
 }
