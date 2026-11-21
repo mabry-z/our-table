@@ -253,6 +253,20 @@ insert into public.recipes (id, household_id, title, source_url, servings, time_
   ('5ae04179-99af-412b-a743-46a55d6d4af3', '4e305711-6464-4621-a4a2-138d007a26f5', 'Sheet-pan gnocchi with sausage', 'https://www.budgetbytes.com/sheet-pan-gnocchi-with-sausage/', 4, 35, '{}', null, '[]'::jsonb, 'box', null, null, '{}'::jsonb, 'link', 'budgetbytes.com', null, null, null, null, '2026-11-17T12:00:00.000Z'),
   ('7b2c2325-d0cf-4563-a0f1-9c3931a50a0b', '4e305711-6464-4621-a4a2-138d007a26f5', 'Grandma''s chicken and dumplings', null, 4, 60, '{}', null, '[]'::jsonb, 'box', null, null, '{}'::jsonb, 'photo', null, null, null, null, null, '2026-11-18T12:00:00.000Z');
 
+insert into public.recipe_ingredients (id, household_id, recipe_id, ingredient_id, amount, unit, note, step_index, position) values
+  ('fe885760-c03c-4d1c-a4d7-d4f8ba387a6c', '4e305711-6464-4621-a4a2-138d007a26f5', 'b66ba2a1-c686-4e67-ab47-17a596b485ef', '0ca40c5a-5423-438c-a12a-03ce6bfc65ec', null, null, 'Pork sausage roll, 1 lb', null, 0),
+  ('57e4dfd9-f98a-4151-a1c4-6539dbe41d29', '4e305711-6464-4621-a4a2-138d007a26f5', 'b66ba2a1-c686-4e67-ab47-17a596b485ef', '584b7427-e1e2-4241-a5f2-4d3b8da808a9', null, null, 'Bell peppers, 3 pack', null, 1),
+  ('f83e882a-08c1-4394-afa9-85a64da0323c', '4e305711-6464-4621-a4a2-138d007a26f5', 'b66ba2a1-c686-4e67-ab47-17a596b485ef', 'ec52ed2c-ef4d-4cc4-a699-398c22691cbc', null, null, 'Penne, 500 g', null, 2),
+  ('6639954b-844c-4269-ac14-99b3d35c33ed', '4e305711-6464-4621-a4a2-138d007a26f5', '2307caf3-2110-430f-aff2-1547f6619ab3', '3dfeb04d-6c5e-49c3-adf0-d7c5a520a977', null, null, 'Chicken breast, 600 g', null, 0),
+  ('7ed9b2fb-ae4e-4fb3-aad6-56a395fd7afb', '4e305711-6464-4621-a4a2-138d007a26f5', '2307caf3-2110-430f-aff2-1547f6619ab3', '5840fbfd-eb5a-4bad-a201-9355909a571d', null, null, 'Black beans, 2 cans', null, 1),
+  ('44e90913-5bf8-4f11-ae26-f81739033249', '4e305711-6464-4621-a4a2-138d007a26f5', '2307caf3-2110-430f-aff2-1547f6619ab3', '63f86ea9-431c-43b7-a165-58e579f76377', null, null, 'Taco seasoning', null, 2),
+  ('6cbbeddc-1b22-4aee-ab4b-191cf66db5d2', '4e305711-6464-4621-a4a2-138d007a26f5', 'f1f425f2-88b0-4206-ad64-649efee5eba2', 'd49c0139-9c59-469f-a860-6a5db755d247', null, null, 'Chicken thighs, 1 kg', null, 0),
+  ('5551e402-48c7-490c-a6d3-f0a6a66bddac', '4e305711-6464-4621-a4a2-138d007a26f5', 'f1f425f2-88b0-4206-ad64-649efee5eba2', '37de36b7-165a-4e65-ae04-0ab71a5fffb1', null, null, 'Potatoes, 2 kg', null, 1),
+  ('80a69a08-198a-453e-a291-8c084189e4a2', '4e305711-6464-4621-a4a2-138d007a26f5', '33854ff6-a953-4e32-a64b-77e294abf5de', 'fdb9e7fd-ce66-4787-a1ea-e4f1d9533f1f', null, null, 'Chicken drumsticks, 1.5 kg', null, 0),
+  ('6603f663-3335-47b1-a4b8-d67fc3f21db9', '4e305711-6464-4621-a4a2-138d007a26f5', '33854ff6-a953-4e32-a64b-77e294abf5de', '09b0d85a-3e88-4d3c-ae43-64a2bcc32100', null, null, 'Corn on the cob, 4', null, 1),
+  ('b47ccf72-c1c5-4062-a1e0-9026d095b2b6', '4e305711-6464-4621-a4a2-138d007a26f5', 'aeed68ce-7f4b-46e0-afe7-62b67765e3e4', 'e1b6bd35-3075-40a7-ac58-0b8deed8390b', null, null, 'Pork schnitzel, 600 g', null, 0),
+  ('1c78af9b-e194-419b-a754-7fcb2c420813', '4e305711-6464-4621-a4a2-138d007a26f5', 'aeed68ce-7f4b-46e0-afe7-62b67765e3e4', '51232348-2a2c-4082-ac9a-24e4cce5e98a', null, null, 'Spätzle, 500 g', null, 1);
+
 insert into public.picks (id, household_id, recipe_id, added_by, added_at) values
   ('bc355cfa-33d6-4af8-a354-e56e91e67980', '4e305711-6464-4621-a4a2-138d007a26f5', '5ae04179-99af-412b-a743-46a55d6d4af3', null, '2026-11-17T12:00:00.000Z'),
   ('1e3c8bea-ffcf-4c54-a0be-3cc6c414c02c', '4e305711-6464-4621-a4a2-138d007a26f5', '7b2c2325-d0cf-4563-a0f1-9c3931a50a0b', null, '2026-11-18T12:00:00.000Z');

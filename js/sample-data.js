@@ -54,6 +54,12 @@ const AISLES = {
   pork_schnitzel: 'meat', spaetzle: 'pantry', nuggets: 'frozen', fried_shrimp: 'frozen', pasta: 'pantry',
 };
 
+// What each sample recipe needs, from the ingredients above (the list label is the line).
+const RECIPE_INGS = {
+  sausage_pasta: ['pork_sausage', 'bell_peppers', 'penne'], taco_bowls: ['chicken_breast', 'black_beans', 'taco_seasoning'],
+  sheetpan: ['chicken_thighs', 'potatoes'], oven_chicken: ['drumsticks', 'corn'], schnitzel: ['pork_schnitzel', 'spaetzle'],
+};
+
 // This week's picks, as in mockups/ask-bar.html: key, title, minutes, origin, link
 const PICKS = [
   ['gnocchi', 'Sheet-pan gnocchi with sausage', 35, 'link', 'https://www.budgetbytes.com/sheet-pan-gnocchi-with-sausage/'],
@@ -122,7 +128,7 @@ export function sampleRows() {
       recipe_sites: ['allrecipes.com', 'budgetbytes.com', 'seriouseats.com', 'simplyrecipes.com', 'bbcgoodfood.com', 'kingarthurbaking.com'],
     }],
     members: [], stores: [], ingredients: [], products: [], prices: [], ingredient_matches: [],
-    recipes: [], picks: [], plans: [], plan_meals: [], usuals: [], list_items: [],
+    recipes: [], recipe_ingredients: [], picks: [], plans: [], plan_meals: [], usuals: [], list_items: [],
     exchange_rates: [{ rate_date: '2026-10-26', base: 'EUR', quote: 'USD', rate: RATE, source: 'sample' }],
   };
 
@@ -155,6 +161,11 @@ export function sampleRows() {
     // newest first in the recipe box, in mockup order
     created_at: new Date(Date.parse('2026-10-26T12:00:00Z') - i * 60000).toISOString(),
   }));
+
+  Object.entries(RECIPE_INGS).forEach(([rk, keys]) => keys.forEach((k, i) => R.recipe_ingredients.push({
+    id: uid(`ri:${rk}:${k}`), household_id: hh, recipe_id: uid('recipe:' + rk), ingredient_id: uid('ing:' + k),
+    amount: null, unit: null, note: ITEMS.find(x => x[0] === k)[2], step_index: null, position: i,
+  })));
 
   PICKS.forEach(([k, title, time_min, origin, url], i) => {
     const id = uid('recipe:' + k);

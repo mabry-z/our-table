@@ -3,6 +3,14 @@
 export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 export const icon = name => `<i class="ti ti-${name}" aria-hidden="true"></i>`;
 
+// Where a recipe came from: the site, a photo, typed in, or the recipe box.
+export function sourcePill(r) {
+  const [ic, text] = r.origin === 'link' || r.origin === 'ai_found' ? ['link', r.site || 'From a link']
+    : r.origin === 'photo' ? ['photo', 'From a photo']
+      : r.origin === 'typed' ? ['pencil', 'Typed in']
+        : r.origin === 'ai_created' ? ['sparkles', 'Created for you'] : ['book', 'From our box'];
+  return `<span class="pl" style="background:#F1ECE3;color:#574E44">${icon(ic)} ${esc(text)}</span>`;
+}
 export const lukePill = text => `<span class="pl" style="background:#EDE4EE;color:#5D4663">${icon('heart')} ${esc(text)}</span>`;
 
 export const stars = n => (n ? '★'.repeat(n) + '☆'.repeat(5 - n) : 'Not rated yet');
