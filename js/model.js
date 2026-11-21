@@ -9,12 +9,14 @@ export const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 export const AISLES = [['produce', 'Produce'], ['meat', 'Meat and seafood'], ['dairy', 'Dairy and eggs'],
   ['bakery', 'Bakery'], ['pantry', 'Pantry'], ['frozen', 'Frozen'], ['other', 'Other']];
 
-// Best guess from a name, matching the phase 2 migration; we can fix misses on the list.
+// Best guess from a name for new ingredients and our own list items. Order matters: frozen
+// before meat (chicken nuggets), dried spices and broth before meat and produce (chicken
+// broth, garlic powder, dried basil), produce before dairy (eggplant).
 const AISLE_GUESS = [
   ['frozen', /(nugget|frozen|fried shrimp|fries|ice cream)/i],
-  ['pantry', /(broth|stock|bouillon|seasoning)/i],
+  ['pantry', /(broth|stock|bouillon|seasoning|dried|powder|flakes|paprika|cumin|cinnamon|nutmeg|vanilla|vinegar|honey|mustard|ketchup|mayo|soy sauce|black pepper|peppercorn)/i],
   ['meat', /(chicken|beef|pork|sausage|turkey|bacon|ham|steak|schnitzel|shrimp|salmon|cod|fish|tuna)/i],
-  ['produce', /(pepper|onion|potato|corn|tomato|lettuce|garlic|carrot|celery|apple|lemon|lime|cilantro|parsley|spinach|broccoli|zucchini|cucumber|avocado|green bean)/i],
+  ['produce', /(pepper|onion|potato|corn|tomato|lettuce|garlic|carrot|celery|apple|lemon|lime|cilantro|parsley|basil|thyme|rosemary|mint|dill|chive|sage|oregano|herb|ginger|scallion|shallot|leek|spinach|kale|arugula|cabbage|broccoli|cauliflower|zucchini|squash|pumpkin|eggplant|asparagus|mushroom|cucumber|avocado|green bean|peas|radish|beet|jalape|banana|orange|berr|grape|peach|pear|mango|pineapple|melon|fruit)/i],
   ['dairy', /(milk|cheese|cheddar|parmesan|butter|cream|yogurt|egg)/i],
   ['bakery', /(bread|bun|tortilla|roll|pita)/i],
   ['pantry', /(pasta|penne|spätzle|spaetzle|noodle|rice|beans|flour|sugar|oil|sauce|can|spice|salt)/i],
