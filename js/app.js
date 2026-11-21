@@ -15,7 +15,7 @@ const S = {
   add: null,         // Add sheet (see vAddSheet): { target, mealId, step, name, ing, url, pv, err }
   recipe: null, edit: null, pickOpen: null, aiSpent: null,
   pendingDel: null, swiped: null,   // recipe waiting out its Undo; recipe row swiped open
-  page: null, newUsual: { label: '', qty: '' }, newSkip: '', setErr: '', // Settings sub-pages
+  page: null, newUsual: { label: '', qty: '' }, newSkip: '', newSite: '', setErr: '', // Settings sub-pages
   toast: '', newItem: '', newAisle: '', listErr: '', moveItem: null,
   email: '', signErr: '', busy: false, err: '', user: null,
 };
@@ -24,6 +24,9 @@ let rows = null;
 
 const $ = id => document.getElementById(id);
 const TABS = [['plan', 'calendar-week', 'Plan'], ['recipes', 'book', 'Recipes'], ['list', 'basket', 'List'], ['settings', 'settings', 'Settings']];
+// Sites that turned away the link reader or Anthropic's search when tested (Nov 21, 2026).
+const BLOCKS_APPS = ['allrecipes.com', 'seriouseats.com', 'simplyrecipes.com', 'southernliving.com', 'foodnetwork.com',
+  'thekitchn.com', 'delish.com', 'cookieandkate.com'];
 // Nights marked as leftovers when a week is started, for the household's leftovers per week.
 const LEFTOVER_DAYS = [3, 7, 5, 1, 6, 2, 4];
 
@@ -124,10 +127,12 @@ function placeRecipe(recipeId) {
 // What to call a list item in messages: its ingredient's name, else its label.
 function itemName(it) { return rows.ingredients.find(i => i.id === it.ingredient_id)?.name || it.label; }
 
-// "1 1/2 lb chicken thighs, cut up" -> "Chicken thighs"; "2 cups cheddar – divided" -> "Cheddar"
+// "1 1/2 lb chicken thighs, cut up" -> "Chicken thighs"; "2 cups cheddar – divided" -> "Cheddar";
+// "1 (3- to 4 pound) broiler/fryer chicken, cut into 8 pieces" -> "Broiler/fryer chicken"
 const UNIT = /^\s*[\d¼½¾⅓⅔⅛.,\/\s-]*\s*(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|cans?|bags?|packs?|packages?|boxes?|bunch(es)?|cloves?|heads?|jars?|bottles?|pieces?|slices?|sticks?)?\.?\s+(of\s+)?/i;
 function ingredientName(line) {
-  const n = line.replace(UNIT, '').split(/,|\s[–—-]\s|\(/)[0].trim() || line.trim();
+  const bare = line.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ');
+  const n = bare.replace(UNIT, '').split(/,|\s[–—-]\s/)[0].trim() || line.trim();
   return n.charAt(0).toUpperCase() + n.slice(1);
 }
 const lines = text => (text || '').split('\n').map(l => l.trim()).filter(Boolean);
@@ -195,6 +200,26 @@ async function readRecipe(a, from, read, origin) {
   S.aiSpent = null; // refetched next time Settings opens
 }
 
+// Find: searches our sites, then shows the matches in the sheet to pick from.
+async function runFind(a, q) {
+  Object.assign(a, { step: 'reading', from: 'find', q, err: '' });
+  render();
+  let res;
+  try { res = await data.aiFind(q); } catch (e) { Object.assign(a, { step: 'find', err: e.message }); return; }
+  if (S.add !== a) return;
+  Object.assign(a, { step: 'find', found: res.results, foundCost: res.cost_usd });
+  S.aiSpent = null;
+}
+// Saves a Find result (or reuses the box's copy of that link), then places it like any recipe.
+function saveFound(i, toPicks) {
+  const x = S.add.found[i];
+  const have = rows.recipes.find(r => r.source_url && r.source_url === x.source_url);
+  finishAdd(have || saveRecipe({
+    title: x.title, origin: 'ai_found', source_url: x.source_url, site: x.site, time_min: x.time_min,
+    servings: x.servings, steps: x.steps || [], ing: x.ingredients,
+  }), toPicks);
+}
+
 async function loadSpent() {
   try { S.aiSpent = await data.aiSpent(); } catch (e) { console.error(e); S.aiSpent = { error: true }; }
   if (S.tab === 'settings') render();
@@ -259,12 +284,16 @@ const ACTIONS = {
   tab: v => { S.tab = v; S.add = null; S.recipe = null; S.edit = null; S.page = null; S.swiped = null; window.scrollTo(0, 0); if (v === 'settings') loadSpent(); },
   rmphoto: i => { S.add.photos.splice(Number(i), 1); },
   delrecipe: id => deleteRecipe(id),
+  findput: i => saveFound(Number(i), false),
+  findpick: i => saveFound(Number(i), true),
+  findmore: async v => { const a = S.add; await runFind(a, `${(a.q || '').replace(/, (classic version|Luke-friendly|no dairy|something different)/g, '')}, ${v}`); },
   rmusual: id => {
     const u = rows.usuals.find(x => x.id === id);
     del('usuals', id); refresh(); syncComing();
     S.toast = `${u.label} is off Luke's usuals.`;
   },
   rmskip: i => setHousehold({ foods_we_skip: (M.hh.foods_we_skip || []).filter((_, j) => j !== Number(i)) }),
+  rmsite: i => setHousehold({ recipe_sites: (M.hh.recipe_sites || []).filter((_, j) => j !== Number(i)) }),
   week: v => { S.week = Math.min(M.weeks.length - 1, Math.max(0, S.week + Number(v))); },
   lock: id => { const m = rows.plan_meals.find(x => x.id === id); persist('plan_meals', id, { locked: !m.locked }); },
   swap: id => {
@@ -330,6 +359,11 @@ const A = {
     if (!url) { a.err = 'Paste a recipe link first.'; return; }
     await readRecipe(a, 'link', () => data.importRecipe(url), 'link');
   },
+  findgo: async () => {
+    const a = S.add, q = (a.q || '').trim();
+    if (q.length < 3) { a.err = 'Type what sounds good first.'; return; }
+    await runFind(a, q);
+  },
   textgo: async () => {
     const a = S.add, text = (a.text || '').trim(), url = (a.url || '').trim();
     if (text.length < 20) { a.err = 'Paste the recipe text first.'; return; }
@@ -354,6 +388,16 @@ const A = {
   lop: () => setLeftovers(M.hh.leftovers_per_week + 1),
   openusuals: () => { S.page = 'usuals'; S.setErr = ''; window.scrollTo(0, 0); },
   openskip: () => { S.page = 'skip'; S.setErr = ''; window.scrollTo(0, 0); },
+  opensites: () => { S.page = 'sites'; S.setErr = ''; window.scrollTo(0, 0); },
+  addsite: () => {
+    const s = S.newSite.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0];
+    const list = M.hh.recipe_sites || [];
+    if (!/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(s)) { S.setErr = 'Type a site like budgetbytes.com.'; return; }
+    if (BLOCKS_APPS.includes(s)) { S.setErr = `${s} blocks apps from reading it, so Find can't use it. Use Paste the recipe text for its recipes.`; return; }
+    if (list.includes(s)) { S.setErr = 'That site is already on the list.'; return; }
+    setHousehold({ recipe_sites: [...list, s] });
+    S.newSite = ''; S.setErr = '';
+  },
   closepage: () => { S.page = null; S.setErr = ''; },
   addusual: () => {
     const label = S.newUsual.label.trim(), qty = S.newUsual.qty.trim();
@@ -451,14 +495,14 @@ document.addEventListener('pointerup', endSwipe);
 document.addEventListener('pointercancel', endSwipe);
 
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-rmphoto],[data-delrecipe],[data-rmusual],[data-rmskip],[data-units],[data-a]');
+  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-rmphoto],[data-delrecipe],[data-rmusual],[data-rmskip],[data-findput],[data-findpick],[data-findmore],[data-rmsite],[data-units],[data-a]');
   if (!el || el.disabled) return;
   if (el.dataset.a === 'closeadd' && el.classList.contains('ov') && e.target.closest('[data-stop]')) return;
   if (justSwiped) return;                                          // the end of a swipe isn't a tap
   if (S.swiped && el.dataset.recipe) { S.swiped = null; render(); return; } // a tap closes an open row
   S.toast = '';
   const key = Object.keys(el.dataset).find(k => k in ACTIONS);
-  if (key) ACTIONS[key](el.dataset[key]);
+  if (key) await ACTIONS[key](el.dataset[key]);
   else if (A[el.dataset.a]) await A[el.dataset.a]();
   if (S.screen !== 'loading') render();
   if (S.add?.step === 'type' && !S.add.name) $('tyname')?.focus();
@@ -470,13 +514,15 @@ document.addEventListener('keydown', async e => {
   if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[data-done]')) { e.preventDefault(); e.target.click(); }
   if (e.key === 'Enter' && e.target.id === 'newitem') { e.preventDefault(); A.additem(); render(); $('newitem')?.focus(); }
   if (e.key === 'Enter' && e.target.id === 'linkin') { e.preventDefault(); await A.linkgo(); render(); }
+  if (e.key === 'Enter' && e.target.id === 'findin') { e.preventDefault(); await A.findgo(); render(); }
   if (e.key === 'Enter' && (e.target.id === 'us-qty' || e.target.id === 'us-label')) { e.preventDefault(); A.addusual(); render(); $('us-label')?.focus(); }
   if (e.key === 'Enter' && e.target.id === 'skip-in') { e.preventDefault(); A.addskip(); render(); $('skip-in')?.focus(); }
+  if (e.key === 'Enter' && e.target.id === 'site-in') { e.preventDefault(); A.addsite(); render(); $('site-in')?.focus(); }
 });
 
 // Typing is kept in state, so a re-render never loses it.
 const FIELDS = { tyname: ['add', 'name'], tying: ['add', 'ing'], linkin: ['add', 'url'], pvtitle: ['add', 'name'], pving: ['add', 'ing'],
-  pastetext: ['add', 'text'], pasteurl: ['add', 'url'],
+  pastetext: ['add', 'text'], pasteurl: ['add', 'url'], findin: ['add', 'q'],
   'ed-title': ['edit', 'title'], 'ed-time': ['edit', 'time'], 'ed-serves': ['edit', 'serves'], 'ed-luke': ['edit', 'luke'],
   'ed-ing': ['edit', 'ing'], 'ed-steps': ['edit', 'steps'], 'us-label': ['newUsual', 'label'], 'us-qty': ['newUsual', 'qty'] };
 document.addEventListener('input', e => {
@@ -485,6 +531,7 @@ document.addEventListener('input', e => {
   if (id === 'em') S.email = e.target.value;
   if (id === 'newitem') S.newItem = e.target.value;
   if (id === 'skip-in') S.newSkip = e.target.value;
+  if (id === 'site-in') S.newSite = e.target.value;
 });
 
 document.addEventListener('change', async e => {

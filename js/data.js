@@ -100,6 +100,35 @@ export async function aiRecipe(req) {
   return data;
 }
 
+// Find: searches the household's recipe sites. Returns { results, cost_usd }; each result is a
+// full recipe (readable) or just a title and link for a site that won't let apps read it.
+export async function aiFind(query) {
+  if (mode === 'sample') {
+    await new Promise(r => setTimeout(r, 1200));
+    const R = (title, site, path, time_min, rating, rating_count, ingredients, why) => ({
+      title, site, source_url: `https://www.${site}/${path}/`, time_min, servings: 4, rating, rating_count, why, readable: true, ingredients,
+      steps: [{ text: 'Season the fish.' }, { text: 'Sear it in a hot pan.' }, { text: 'Make the pan sauce and spoon it over.' }],
+    });
+    // Already in rating order, as the AI helper returns them.
+    return {
+      cost_usd: 0.036,
+      results: [
+        R('Lemon butter fish with capers', 'recipetineats.com', 'lemon-butter-fish', 15, 4.9, 1312, ['4 white fish fillets', '2 tbsp capers', '3 tbsp butter', '1 lemon'], 'One pan, a bright caper sauce, hundreds of rave reviews'),
+        R('Fish piccata', 'budgetbytes.com', 'fish-piccata', 25, 4.8, 640, ['1 lb cod fillets', '2 tbsp capers', '1 lemon', '½ cup chicken broth', '2 tbsp flour'], `Classic piccata, a good match for "${query}"`),
+        R('Pan-seared halibut with lemon caper sauce', 'altonbrown.com', 'pan-seared-halibut', 30, 4.7, 212, ['2 halibut fillets', '2 tbsp capers', '1 lemon', '2 tbsp butter', '¼ cup white wine'], 'Alton Brown’s restaurant-style version'),
+        R('Baked cod with lemon and capers', 'skinnytaste.com', 'baked-cod-lemon-capers', 20, 4.9, 38, ['4 cod fillets', '1 tbsp capers', '1 lemon', '2 tbsp olive oil'], 'Lighter, baked instead of pan-fried'),
+        R('Grilled lemon caper fish', 'traeger.com', 'grilled-lemon-caper-fish', 35, null, null, ['2 lb white fish', '3 tbsp capers', '2 lemons', '4 tbsp butter'], 'Done on the grill'),
+      ],
+    };
+  }
+  const { data, error } = await (await client()).functions.invoke('ai', { body: { kind: 'find', query } });
+  if (error) {
+    const body = await error.context?.json?.().catch(() => null);
+    throw new Error(body?.error || 'Couldn’t reach the AI helper. Check your connection.');
+  }
+  return data;
+}
+
 // This month's AI spending for the household (the log is read-only from the app).
 export async function aiSpent() {
   const start = new Date(); start.setUTCDate(1); start.setUTCHours(0, 0, 0, 0);

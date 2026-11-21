@@ -39,7 +39,7 @@ show prices, budget and store tags: keep their layout, drop those parts.
 | AI style | One Ask bar + results sheet of cards that update in place, with a trail of asks to undo to. Not a chat. Quiet cap of about 6 asks per sheet |
 | AI models | Claude Opus 5.5 for planning, creating and tweaking; Claude Sonnet 5.5 for search, swaps and reading photos |
 | AI spending | Every request logged with cost; monthly limit (default $10) pauses AI until the 1st |
-| Recipe sites | Find searches only free, well-tested sites: Allrecipes, Budget Bytes, Serious Eats, Simply Recipes, BBC Good Food, King Arthur Baking. No NYT Cooking |
+| Recipe sites | Find searches only the household's "Sites we like" (Settings). Default, tested Nov 21, 2026 to work with both Anthropic's search and the link reader: Alton Brown (used a lot), Budget Bytes, RecipeTin Eats, BBC Good Food, King Arthur Baking, Traeger, Pinch of Yum, Skinnytaste, Love and Lemons, Taste of Home, Sally's Baking Addiction, Damn Delicious. Blocked for apps (use Paste the recipe text): Allrecipes, Serious Eats, Simply Recipes, Southern Living, Food Network, The Kitchn, Delish, Cookie and Kate. No NYT Cooking |
 
 ## Screens (see mockups)
 
@@ -62,7 +62,12 @@ Recipes and recipe pages (hidden when AI suggestions are off).
   Allrecipes that block the link reader) and screenshots or photos (kind "photo", up to 4, shrunk
   to 1600px JPEG in the browser by `js/photos.js`) with Claude Sonnet 5.5, structured output,
   `fallbacks: "default"`. Every call is logged in `ai_requests` (service key) and refused once the
-  month's spending reaches `households.ai_monthly_limit` (Settings, $5 steps). Check callers with
+  month's spending reaches `households.ai_monthly_limit` (Settings, $5 steps). Kind "find": Claude
+  web search (`web_search_20260209`, max 4 searches, `allowed_domains` = the household's sites)
+  names up to 8 well-reviewed single-recipe pages, each is read by calling `import-recipe`
+  (which also returns the site's star rating and count), and the best 5 by rating come back,
+  weighted by how many people rated it. Cooking time is deliberately not a factor (we choose
+  that ourselves). Pages that can't be read come back as title + link. About 3–4¢. Check callers with
   direct fetches to `/auth/v1/user`, not supabase-js `getUser` (it fails with this project's
   publishable key).
 - **Recipe page and cook mode:** ingredients scaled by a portions control, steps, source link.

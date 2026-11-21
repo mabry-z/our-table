@@ -95,3 +95,5 @@ select.in { appearance: none; -webkit-appearance: none; width: auto; padding-rig
 .swipe-front { position: relative; background: var(--card); padding: 12px 14px; transition: transform .2s ease; touch-action: pan-y; }
 .swipe.open .swipe-front { transform: translateX(-96px); }
 .swipe-front.dragging { transition: none; }
+.rate { display: flex; align-items: center; gap: 4px; font-size: 14px; color: #6E5527; margin-bottom: 2px; }
+.rate .ti { color: #C9A227; font-size: 15px; }

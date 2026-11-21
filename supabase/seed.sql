@@ -3,7 +3,7 @@
 begin;
 
 insert into public.households (id, name, portions, dinners_per_week, leftovers_per_week, time_limit_min, weekly_budget, units, home_currency, default_store_ids, max_stops, foods_we_skip, ai_suggestions, ai_monthly_limit, recipe_sites) values
-  ('4e305711-6464-4621-a4a2-138d007a26f5', 'Our household', 4, 5, 2, 45, 150, 'US', 'USD', array['5592975e-4118-4c20-a023-1fc66244ba64', 'da57bba0-2437-47d2-a5ac-069827b09376', 'cd336ee0-0221-4872-af80-bd4053aa90fe', '57c0ec09-6725-45cf-ac3b-fcc5e63c34cf', 'b008b341-2fe8-4e2f-a1ab-41c1c7c88063', 'c875c6dd-b0b0-4443-a095-74e15c5c5f0b']::uuid[], 0, array['Mushrooms', 'Olives']::text[], true, 10, array['allrecipes.com', 'budgetbytes.com', 'seriouseats.com', 'simplyrecipes.com', 'bbcgoodfood.com', 'kingarthurbaking.com']::text[]);
+  ('4e305711-6464-4621-a4a2-138d007a26f5', 'Our household', 4, 5, 2, 45, 150, 'US', 'USD', array['5592975e-4118-4c20-a023-1fc66244ba64', 'da57bba0-2437-47d2-a5ac-069827b09376', 'cd336ee0-0221-4872-af80-bd4053aa90fe', '57c0ec09-6725-45cf-ac3b-fcc5e63c34cf', 'b008b341-2fe8-4e2f-a1ab-41c1c7c88063', 'c875c6dd-b0b0-4443-a095-74e15c5c5f0b']::uuid[], 0, array['Mushrooms', 'Olives']::text[], true, 10, array['altonbrown.com', 'budgetbytes.com', 'recipetineats.com', 'bbcgoodfood.com', 'kingarthurbaking.com', 'traeger.com', 'pinchofyum.com', 'skinnytaste.com', 'loveandlemons.com', 'tasteofhome.com', 'sallysbakingaddiction.com', 'damndelicious.net']::text[]);
 
 insert into public.stores (id, household_id, name, chain, currency, external_id, sort_order) values
   ('5592975e-4118-4c20-a023-1fc66244ba64', '4e305711-6464-4621-a4a2-138d007a26f5', 'Ramstein', 'Commissary', 'USD', '5873', 0),

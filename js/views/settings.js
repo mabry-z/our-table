@@ -8,6 +8,7 @@ const link = (page, label, value) => `<button class="rrow" data-a="${page}" styl
 export function vSettings(S, M, mode, user) {
   if (S.page === 'usuals') return vUsuals(S, M);
   if (S.page === 'skip') return vSkip(S, M);
+  if (S.page === 'sites') return vSites(S, M);
   const hh = M.hh;
   let h = head('Household', 'Settings');
   if (S.toast) h += `<div class="toast">${icon('check')}<span style="flex:1">${esc(S.toast)}</span></div>`;
@@ -23,6 +24,8 @@ export function vSettings(S, M, mode, user) {
     + `<div class="bar"><div style="width:${used == null ? 0 : Math.min(100, limit ? used / limit * 100 : 100).toFixed(0)}%"></div></div>`
     + `<div class="mu">${used == null ? '' : `${sp.count} ${sp.count === 1 ? 'request' : 'requests'} · `}resets on the 1st. When the limit is reached, AI reading pauses; everything else keeps working.</div></div>`
     + row('Monthly limit', stepper('lm', 'lp', '$' + limit, 'monthly AI limit'))
+    + link('opensites', 'Sites we like', `${(hh.recipe_sites || []).length} sites`)
+    + row('Finding a recipe', `<span class="mu">about 3¢ each</span>`)
     + row('Reading pasted text', `<span class="mu">about 1¢ each</span>`)
     + row('Reading screenshots and photos', `<span class="mu">about 2¢ each</span>`) + `</div>`;
   const people = [...M.members.values()].filter(Boolean);
@@ -48,6 +51,16 @@ function vUsuals(S, M) {
     + `<input class="in" id="us-label" placeholder="e.g. Chicken nuggets" autocomplete="off" value="${esc(S.newUsual.label)}" aria-label="Item">`
     + `<div style="display:flex;gap:6px;margin-top:8px"><input class="in" id="us-qty" placeholder="How much, e.g. 2 bags" autocomplete="off" value="${esc(S.newUsual.qty)}" aria-label="How much">`
     + `<button class="ib dk" data-a="addusual">Add</button></div><div class="err">${esc(S.setErr)}</div></div>`;
+  return h;
+}
+
+function vSites(S, M) {
+  const list = M.hh.recipe_sites || [];
+  let h = back() + `<div class="sf dsp" style="font-size:26px">Sites we like</div><div class="mu" style="margin:4px 0 12px">Find searches only these. Free recipe sites with tested recipes work best.</div>`;
+  h += `<div class="cd" style="padding:4px 14px">${list.length ? list.map((s, i) => `<div class="row" style="padding:10px 0;${i ? 'border-top:1px solid var(--rule2)' : ''}"><span>${esc(s)}</span><button class="mini" data-rmsite="${i}" aria-label="Remove ${esc(s)}" style="border:none;background:none;color:var(--mu)">${icon('x')}</button></div>`).join('') : '<div class="mu" style="padding:10px 0">None yet. Find needs at least one.</div>'}</div>`;
+  h += `<div class="cd"><div class="ey" style="margin-bottom:8px">Add a site</div><div style="display:flex;gap:6px"><input class="in" id="site-in" type="url" inputmode="url" placeholder="e.g. damndelicious.net" autocomplete="off" value="${esc(S.newSite)}" aria-label="Recipe site">`
+    + `<button class="ib dk" data-a="addsite">Add</button></div><div class="err">${esc(S.setErr)}</div>`
+    + `<div class="mu" style="margin-top:8px">Some big sites block apps from reading them: Allrecipes, Serious Eats, Simply Recipes, Southern Living, Food Network, The Kitchn, Delish and Cookie and Kate. For those, open the recipe and use Paste the recipe text.</div></div>`;
   return h;
 }
 

@@ -175,8 +175,10 @@ the non-AI pieces come first so the app is useful sooner, and the finished app m
 3. **Find, photos and the AI groundwork.** First part built Nov 21, 2026: the `ai` edge function
    (Claude Sonnet 5.5, usage log, monthly limit in Settings), "Paste the recipe text" (added for
    sites that block the link reader, about 1¢) and screenshot or photo import (up to 4 pictures of
-   one recipe, flags for anything unclear, about 2¢). Still to do: Find, "Choose several" into
-   picks, keeping recipe photos, sites we like. Plan: Edge function with the AI key, usage log and monthly
+   one recipe, flags for anything unclear, about 2¢). Then Find (in the Add sheet, about 3¢,
+   with "Add to <day>", "Save to picks" and narrowing chips) and Sites we like in Settings, with a
+   default list of 12 sites tested to work. Still to do: "Choose several" into picks, keeping
+   recipe photos. Plan: Edge function with the AI key, usage log and monthly
    limit; Find a recipe (search our list of sites, read the results with the phase 2 link importer)
    in the Add dinner sheet and on Recipes, with "Add to <day>", "Save" and narrowing chips;
    screenshot and photo import with the check-it-over card and flags; "Choose several" into picks;
@@ -200,7 +202,7 @@ flyer work.
 | Risk | Impact | Fallback |
 | --- | --- | --- |
 | A site has no recipe data on the page | Link import fails | Claude reads the page; or screenshot it |
-| A site blocks automated readers (Nov 21 test: Allrecipes, Serious Eats and Simply Recipes answered 403; BBC Good Food and King Arthur worked) | Link import says the site refused | Screenshot it (phase 3); revisit those sites in "Sites we like" before building Find |
+| A site blocks automated readers (Nov 21 test: Allrecipes, Serious Eats, Simply Recipes, Southern Living, Food Network, The Kitchn and Cookie and Kate refused the link reader; Allrecipes, Serious Eats, Simply Recipes, Southern Living and Delish also refuse Anthropic's search. Alton Brown and Traeger work) | Link import and Find can't use it | Paste the recipe text or a screenshot; Find uses only sites tested to work, and Settings refuses known-blocked sites |
 | Photo misread (amounts, handwriting) | Wrong list | Check-it-over card with flagged items before saving |
 | AI recipes untested | A dud dinner | Labeled "Created for you"; ratings teach the planner |
 | AI costs creep | Surprise bill | Usage log and a hard monthly limit |

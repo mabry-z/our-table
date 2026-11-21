@@ -1,6 +1,7 @@
 // Reads the recipe most sites build into their pages (schema.org Recipe in JSON-LD).
 // Plain JavaScript with no imports, so the edge function and a browser test can share it.
-// Returns { title, servings, time_min, ingredients: [], steps: [{ text }] } or null.
+// Returns { title, servings, time_min, rating, rating_count, ingredients: [], steps: [{ text }] }
+// or null. rating is the site's average stars (0-5) and rating_count how many rated it, when given.
 
 export function parseRecipe(html) {
   const blocks = [...html.matchAll(/<script[^>]*type\s*=\s*["']?application\/ld\+json["']?[^>]*>([\s\S]*?)<\/script>/gi)];
@@ -28,10 +29,15 @@ function toRecipe(r) {
   const ingredients = [].concat(r.recipeIngredient || r.ingredients || []).map(clean).filter(Boolean);
   const steps = instructions(r.recipeInstructions).map(clean).filter(Boolean).map(text => ({ text }));
   const time = minutes(r.totalTime) || (minutes(r.prepTime) + minutes(r.cookTime)) || null;
+  const agg = [].concat(r.aggregateRating || [])[0] || {};
+  const value = parseFloat(agg.ratingValue), best = parseFloat(agg.bestRating) || 5;
+  const count = parseInt(String(agg.ratingCount ?? agg.reviewCount ?? '').replace(/[^\d]/g, ''), 10);
   return {
     title: clean(r.name) || 'Untitled recipe',
     servings: servings(r.recipeYield),
     time_min: time,
+    rating: value > 0 ? Math.round(value / best * 50) / 10 : null,   // on a 5-star scale, 1 decimal
+    rating_count: count > 0 ? count : null,
     ingredients,
     steps,
   };

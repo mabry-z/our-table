@@ -60,6 +60,11 @@ const RECIPE_INGS = {
   sheetpan: ['chicken_thighs', 'potatoes'], oven_chicken: ['drumsticks', 'corn'], schnitzel: ['pork_schnitzel', 'spaetzle'],
 };
 
+// Free recipe sites that both Anthropic's search and the link reader could read (Nov 21, 2026).
+const RECIPE_SITES = ['altonbrown.com', 'budgetbytes.com', 'recipetineats.com', 'bbcgoodfood.com', 'kingarthurbaking.com',
+  'traeger.com', 'pinchofyum.com', 'skinnytaste.com', 'loveandlemons.com', 'tasteofhome.com', 'sallysbakingaddiction.com',
+  'damndelicious.net'];
+
 // This week's picks, as in mockups/ask-bar.html: key, title, minutes, origin, link
 const PICKS = [
   ['gnocchi', 'Sheet-pan gnocchi with sausage', 35, 'link', 'https://www.budgetbytes.com/sheet-pan-gnocchi-with-sausage/'],
@@ -125,7 +130,7 @@ export function sampleRows() {
       default_store_ids: DEFAULT_STORES.map(k => uid('store:' + k)), max_stops: 0,
       foods_we_skip: ['Mushrooms', 'Olives'],
       ai_suggestions: true, ai_monthly_limit: 10,
-      recipe_sites: ['allrecipes.com', 'budgetbytes.com', 'seriouseats.com', 'simplyrecipes.com', 'bbcgoodfood.com', 'kingarthurbaking.com'],
+      recipe_sites: RECIPE_SITES,
     }],
     members: [], stores: [], ingredients: [], products: [], prices: [], ingredient_matches: [],
     recipes: [], recipe_ingredients: [], picks: [], plans: [], plan_meals: [], usuals: [], list_items: [],

@@ -1,6 +1,12 @@
 import { DAYS } from '../model.js';
 import { esc, icon, lukePill, sourcePill, weekHead } from '../ui.js';
 
+// A site's own rating, e.g. "★ 4.8 · 1,200 ratings".
+function stars(r) {
+  if (!r.rating) return '';
+  return `<div class="rate">${icon('star-filled')} ${r.rating.toFixed(1)}${r.rating_count ? ` <span class="mu">· ${r.rating_count.toLocaleString('en-US')} ${r.rating_count === 1 ? 'rating' : 'ratings'}</span>` : ''}</div>`;
+}
+
 function addBtn(m) { return `<button class="ib" data-add="${m.id}">${icon('plus')} Add dinner</button>`; }
 const originIcon = r => (r.origin === 'photo' ? 'photo' : r.origin === 'link' || r.origin === 'ai_found' ? 'link' : r.origin === 'typed' ? 'pencil' : 'book');
 
@@ -80,12 +86,30 @@ export function vAddSheet(S, M) {
         + `<div class="ey" style="margin:14px 2px 8px">Or add something else</div>`;
     }
     if (a.target !== 'box') b += opt('data-addstep="box"', 'book', 'From our recipe box', 'Pick something we already have');
-    b += opt('data-addstep="link"', 'link', 'Paste a link', 'From a recipe site; its ingredients come too')
+    b += opt('data-addstep="find"', 'search', 'Find a recipe', 'Searches our recipe sites, e.g. lemon caper fish · about 3¢')
+      + opt('data-addstep="link"', 'link', 'Paste a link', 'From a recipe site; its ingredients come too')
       + opt('data-addstep="text"', 'clipboard-text', 'Paste the recipe text', 'For sites that block links, like Allrecipes · about 1¢')
       + opt('data-addstep="photo"', 'photo', 'Screenshot or photo', 'A web page, cookbook page or recipe card · about 2¢')
       + opt('data-addstep="type"', 'pencil', 'Type it', 'Just a name, plus ingredients if you want them on the list')
       + (a.target === 'meal' && !meal.leftovers ? opt('data-a="leftovers"', 'bowl', 'Leftovers night', 'No cooking; nothing added to the list') : '')
-      + `<div class="mu" style="margin:10px 2px 0">Find is coming next.</div>`;
+;
+  }
+  if (a.step === 'find') {
+    const put = a.target === 'meal' ? `Add to ${day}` : a.target === 'picks' ? 'Add to picks' : 'Save';
+    b += `<label class="lbl" for="findin">What sounds good?</label><div style="display:flex;gap:6px"><input class="in" id="findin" autocomplete="off" placeholder="e.g. lemon caper fish" value="${esc(a.q || '')}">`
+      + `<button class="ib dk" data-a="findgo">Search</button></div><div class="err">${esc(a.err || '')}</div>`;
+    if (!a.found) b += `<div class="mu" style="margin-top:6px">Searches our recipe sites (Settings › Sites we like) for well-reviewed recipes and shows the best rated first. About 3¢ a search.</div>`;
+    else {
+      b += `<div class="mu" style="margin:12px 2px 8px">${a.found.length} ${a.found.length === 1 ? 'match' : 'matches'}${a.foundCost != null ? ` · about ${Math.max(1, Math.round(a.foundCost * 100))}¢` : ''}</div>`
+        + a.found.map((x, i) => x.readable
+          ? `<div class="cd">${stars(x)}<div class="ey">${[esc(x.site), x.time_min ? x.time_min + ' min' : '', x.ingredients.length + ' ingredients'].filter(Boolean).join(' · ')}</div>`
+            + `<div class="sf" style="font-size:18px;line-height:1.25;margin-top:2px">${esc(x.title)}</div>${x.why ? `<div class="mu" style="margin-top:2px">${esc(x.why)}</div>` : ''}`
+            + `<div class="acts">${a.target === 'meal' ? `<button class="ib" data-findpick="${i}">Save to picks</button>` : ''}<button class="ib dk" data-findput="${i}">${put}</button></div></div>`
+          : `<div class="cd ghost"><div class="ey">${esc(x.site)}</div><div class="sf" style="font-size:17px;line-height:1.25;margin-top:2px">${esc(x.title)}</div>`
+            + `<div class="mu" style="margin-top:4px">This site doesn't let apps read it. Open it, copy the recipe, and use Paste the recipe text.</div>`
+            + `<div class="acts"><a class="ib" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none">${icon('external-link')} Open</a></div></div>`).join('')
+        + `<div class="ey" style="margin:6px 2px 6px">Narrow it down</div><div class="pills" style="margin-top:0">${['classic version', 'Luke-friendly', 'no dairy', 'something different'].map(c => `<button class="ib" data-findmore="${c}">${c}</button>`).join('')}</div>`;
+    }
   }
   if (a.step === 'text') {
     b += `<div class="mu" style="margin:0 2px 8px">On the recipe page, select from the title down through the steps, copy, and paste here. Claude sorts out the ingredients and steps.</div>`
@@ -112,11 +136,11 @@ export function vAddSheet(S, M) {
       + `<div class="err">${esc(a.err || '')}</div>`
       + `<div class="mu" style="margin-top:6px">Works with most recipe sites. You'll get to check it before it's saved.</div>`;
   }
-  if (a.step === 'reading') b += `<div class="cd" style="text-align:center"><div class="sf" style="font-size:18px">${a.from === 'link' ? 'Reading the recipe…' : 'Claude is reading it…'}</div><div class="mu">${a.from === 'link' ? esc(a.url || '') : 'This takes a few seconds.'}</div></div>`;
+  if (a.step === 'reading') b += `<div class="cd" style="text-align:center"><div class="sf" style="font-size:18px">${a.from === 'link' ? 'Reading the recipe…' : a.from === 'find' ? 'Searching our recipe sites…' : 'Claude is reading it…'}</div><div class="mu">${a.from === 'link' ? esc(a.url || '') : a.from === 'find' ? esc(a.q || '') + ' · this takes up to half a minute' : 'This takes a few seconds.'}</div></div>`;
   if (a.step === 'preview') {
     const p = a.pv;
     b += `<div class="mu" style="margin:0 2px 8px">Check it over. You can fix anything before it's saved.</div>`
-      + `<div class="ey">${[esc(p.site || (p.origin === 'photo' ? 'From your photo' : '')), p.time_min ? p.time_min + ' min' : '', p.servings ? 'serves ' + p.servings : '', p.steps?.length ? p.steps.length + ' steps' : ''].filter(Boolean).join(' · ')}</div>`
+      + stars(p) + `<div class="ey">${[esc(p.site || (p.origin === 'photo' ? 'From your photo' : '')), p.time_min ? p.time_min + ' min' : '', p.servings ? 'serves ' + p.servings : '', p.steps?.length ? p.steps.length + ' steps' : ''].filter(Boolean).join(' · ')}</div>`
       + `<label class="lbl" for="pvtitle">Name</label><input class="in" id="pvtitle" value="${esc(a.name ?? p.title)}" autocomplete="off">`
       + `<label class="lbl" for="pving">Ingredients · they go on the list</label><textarea class="fld" id="pving" rows="${Math.min(10, Math.max(3, p.ingredients.length))}">${esc(a.ing ?? p.ingredients.join('\n'))}</textarea>`
       + (p.unclear?.length ? p.unclear.map(u => `<div class="banner" style="margin:8px 0 0">${icon('alert-circle')} ${esc(u)}</div>`).join('') : '')

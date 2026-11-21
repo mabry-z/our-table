@@ -5,6 +5,9 @@
 //   POST {"kind": "photo", "images": [{"media_type": "image/jpeg", "data": "<base64>"}, ...]}  (1-4)
 //     200 {"title", "servings", "time_min", "ingredients": [...], "steps": [{"text"}], "unclear": [...],
 //          "site", "source_url", "cost_usd"}
+//   POST {"kind": "find", "query": "lemon caper fish"}
+//     200 {"results": [{...recipe, "why"} | {"title", "url", "site", "why", "readable": false}], "cost_usd"}
+//     Searches only the household's recipe sites, then reads each page with import-recipe.
 //     422 {"error"} when it isn't a recipe; 429 {"error"} when the monthly limit is reached
 //
 // Only signed-in members of a household may call it. The Claude key never leaves this function.
@@ -41,10 +44,104 @@ async function caller(authorization: string) {
   const me = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: asCaller(authorization) });
   if (!me.ok) return null;
   const user = await me.json();
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/members?select=household_id,households(ai_monthly_limit)&user_id=eq.${user.id}&limit=1`,
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/members?select=household_id,households(ai_monthly_limit,recipe_sites,foods_we_skip)&user_id=eq.${user.id}&limit=1`,
     { headers: asCaller(authorization) });
   const [m] = res.ok ? await res.json() : [];
-  return m ? { userId: user.id as string, householdId: m.household_id as string, limit: Number(m.households?.ai_monthly_limit ?? 10) } : { userId: user.id, householdId: null, limit: 0 };
+  const hh = m?.households ?? {};
+  return m
+    ? { userId: user.id as string, householdId: m.household_id as string, limit: Number(hh.ai_monthly_limit ?? 10),
+        sites: (hh.recipe_sites ?? []) as string[], skip: (hh.foods_we_skip ?? []) as string[] }
+    : { userId: user.id, householdId: null, limit: 0, sites: [], skip: [] };
+}
+
+// Find: Claude searches the household's sites and names up to 8 well-reviewed recipe pages; each
+// is then read by the import-recipe function (no AI), so results arrive with their ingredients and
+// star rating. The best 5 are returned, best rated first. Cooking time isn't a factor.
+const WEB_SEARCH_USD = 0.01; // $10 per 1,000 searches
+const CANDIDATES = 8, SHOWN = 5;
+
+// Ranks by rating, trusting a rating more the more people gave it: 4.8 from 1,200 beats 5.0 from 3.
+// Unrated recipes count as an ordinary 4 stars.
+const score = (r: { rating?: number | null; rating_count?: number | null }) =>
+  r.rating ? (r.rating * (r.rating_count ?? 1) + 4 * 25) / ((r.rating_count ?? 1) + 25) : 4;
+type Found = { error?: string; status?: number; results?: Record<string, unknown>[]; cost?: number; model?: string; input?: number; output?: number };
+async function find(authorization: string, who: { sites: string[]; skip: string[] }, query: string): Promise<Found> {
+  let sites = who.sites.map((s) => s.trim().toLowerCase()).filter(Boolean);
+  if (!sites.length) return { error: "Add some recipe sites in Settings first.", status: 400 };
+  const prompt = `Find up to ${CANDIDATES} recipes for a family's dinner that match: "${query}".
+Search only the allowed recipe sites. Choose pages that are one recipe each, never roundups or collections ("40 easy dinners").
+Quality matters most: prefer well-tested recipes with many good reviews or high ratings, and classic versions from trusted cooks.
+Don't consider how long a recipe takes.${who.skip.length ? `\nThe family doesn't eat: ${who.skip.join(", ")}. Leave out recipes built around those.` : ""}
+When done, reply with only one line per recipe, best first, in this form:
+<page URL> | <why it fits, under 12 words>`;
+
+  let msg: Anthropic.Beta.BetaMessage | null = null;
+  let searches = 0, input = 0, output = 0, model = MODEL;
+  for (let attempt = 0; attempt < 3 && !msg; attempt++) {
+    try {
+      const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: prompt }];
+      for (let turn = 0; turn < 3; turn++) {
+        const r = await anthropic.beta.messages.create({
+          model: MODEL, max_tokens: 4000, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default",
+          output_config: { effort: "low" },
+          tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 4, allowed_domains: sites }],
+          messages,
+        } as Anthropic.Beta.MessageCreateParamsNonStreaming);
+        input += r.usage.input_tokens; output += r.usage.output_tokens; model = r.model;
+        searches += (r.usage as { server_tool_use?: { web_search_requests?: number } }).server_tool_use?.web_search_requests ?? 0;
+        if (r.stop_reason !== "pause_turn") { msg = r; break; }
+        messages.push({ role: "assistant", content: r.content });    // long search: let it carry on
+      }
+    } catch (e) {
+      // A site that blocks Anthropic's search makes the whole request fail; drop it and retry.
+      const blocked = /not accessible to our user agent: \[([^\]]*)\]/.exec(String(e))?.[1];
+      if (!blocked) throw e;
+      const out = blocked.split(",").map((s) => s.replace(/['"\s]/g, ""));
+      sites = sites.filter((s) => !out.includes(s));
+      if (!sites.length) return { error: "None of your sites can be searched. Check Sites we like in Settings.", status: 400 };
+    }
+  }
+  const [pin, pout] = PRICES[model] ?? [5, 25];
+  const cost = (input * pin + output * pout) / 1e6 + searches * WEB_SEARCH_USD;
+  if (!msg) return { error: "The search didn't finish. Try again.", status: 502, cost, model, input, output };
+  if (msg.stop_reason === "refusal") return { error: "Claude couldn't search for that. Try other words.", status: 422, cost, model, input, output };
+
+  // Titles from the search results, for pages the reader can't open.
+  const titles = new Map<string, string>();
+  for (const b of msg.content as Array<{ type: string; content?: unknown }>) {
+    if (b.type === "web_search_tool_result" && Array.isArray(b.content)) {
+      for (const r of b.content as Array<{ url?: string; title?: string }>) if (r.url && r.title) titles.set(r.url, r.title);
+    }
+  }
+  const text = msg.content.filter((b) => b.type === "text").map((b) => (b as { text: string }).text).join("\n");
+  const picks: { url: string; why: string }[] = [];
+  for (const line of text.split("\n")) {
+    const m = /(https?:\/\/[^\s|)\]>]+)[\s)\]>]*\|?\s*(.*)/.exec(line);
+    if (!m) continue;
+    let u: URL;
+    try { u = new URL(m[1]); } catch { continue; }
+    const host = u.hostname.replace(/^www\./, "");
+    if (!sites.some((s) => host === s || host.endsWith("." + s))) continue;
+    if (picks.some((p) => p.url === u.toString())) continue;
+    picks.push({ url: u.toString(), why: m[2].replace(/^[-–—:\s]+/, "").trim() });
+    if (picks.length === CANDIDATES) break;
+  }
+
+  const results: Array<Record<string, any>> = await Promise.all(picks.map(async (p) => {
+    const site = new URL(p.url).hostname.replace(/^www\./, "");
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/import-recipe`, {
+        method: "POST", headers: { ...asCaller(authorization), "content-type": "application/json" }, body: JSON.stringify({ url: p.url }),
+      });
+      const r = await res.json();
+      if (res.ok && r.ingredients?.length) return { ...r, why: p.why, readable: true };
+    } catch { /* fall through */ }
+    return { title: titles.get(p.url) ?? site, url: p.url, site, why: p.why, readable: false };
+  }));
+  // Best rated first (a stable sort keeps Claude's order among equals); pages we couldn't read last.
+  const readable = results.filter((r) => r.readable).sort((a, b) => score(b) - score(a));
+  const unreadable = results.filter((r) => !r.readable);
+  return { results: [...readable, ...unreadable].slice(0, SHOWN), cost, model, input, output };
 }
 
 async function spentThisMonth(authorization: string, householdId: string) {
@@ -97,6 +194,28 @@ Deno.serve(async (req) => {
   if (!who.householdId) return json({ error: "Your account isn't part of a household." }, 403);
 
   const body = await req.json().catch(() => ({}));
+
+  if (body.kind === "find") {
+    const query = String(body.query ?? "").trim().slice(0, 200);
+    if (query.length < 3) return json({ error: "Type what sounds good first." }, 400);
+    try {
+      if (await spentThisMonth(authorization, who.householdId) >= who.limit) {
+        return json({ error: `This month's AI limit of $${who.limit.toFixed(2)} is reached. It resets on the 1st; you can raise it in Settings.` }, 429);
+      }
+      const f = await find(authorization, who, query);
+      if (f.cost != null) {
+        await logUse({ household_id: who.householdId, user_id: who.userId, kind: "find", model: f.model,
+          input_tokens: f.input, output_tokens: f.output, cost_usd: Math.round(f.cost * 10000) / 10000 });
+      }
+      if (f.error) return json({ error: f.error }, f.status ?? 400);
+      if (!f.results?.length) return json({ error: "Nothing matched on your sites. Try different words." }, 422);
+      return json({ results: f.results, cost_usd: Math.round((f.cost ?? 0) * 1000) / 1000 });
+    } catch (e) {
+      console.error("ai find:", e);
+      return json({ error: "The search had a problem. Try again in a minute." }, 502);
+    }
+  }
+
   let content: Anthropic.Beta.BetaContentBlockParam[];
   let url: URL | null = null;
   if (body.kind === "text") {
