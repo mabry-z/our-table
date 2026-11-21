@@ -49,9 +49,9 @@ const ITEMS = [
 
 // Aisle for each ingredient above, so the list can group the way we walk the store.
 const AISLES = {
-  pork_sausage: 'meat', bell_peppers: 'produce', penne: 'pantry', chicken_breast: 'meat', black_beans: 'pantry',
-  taco_seasoning: 'pantry', chicken_thighs: 'meat', potatoes: 'produce', drumsticks: 'meat', corn: 'produce',
-  pork_schnitzel: 'meat', spaetzle: 'pantry', nuggets: 'frozen', fried_shrimp: 'frozen', pasta: 'pantry',
+  pork_sausage: 'meat', bell_peppers: 'produce', penne: 'pasta', chicken_breast: 'meat', black_beans: 'canned',
+  taco_seasoning: 'spices', chicken_thighs: 'meat', potatoes: 'produce', drumsticks: 'meat', corn: 'produce',
+  pork_schnitzel: 'meat', spaetzle: 'pasta', nuggets: 'frozen', fried_shrimp: 'frozen', pasta: 'pasta',
 };
 
 // What each sample recipe needs, from the ingredients above (the list label is the line).

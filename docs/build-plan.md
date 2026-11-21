@@ -120,7 +120,7 @@ is dropped.
 | --- | --- | --- |
 | `households` | Defaults: portions (4), dinners per week, time limit, units, AI on/off, monthly AI limit, recipe sites | Add `ai_suggestions`, `ai_monthly_limit`, `recipe_sites`; budget, currency, stores and max stops parked |
 | `members` | Who can sign in | Same |
-| `ingredients` | Generic ingredient | Add `aisle` (produce, meat, dairy, bakery, pantry, frozen, other; "meat" shows as "Meat and seafood"), filled in once from the name |
+| `ingredients` | Generic ingredient | Add `aisle`, guessed from the name and changeable from the list (remembered). 17 aisles since migration `specific_aisles`: produce, bakery and bread, deli, meat and poultry, seafood, dairy and eggs, pasta rice and grains, canned and jarred, condiments and sauces, spices and seasonings, baking and oils, breakfast and cereal, snacks, drinks, frozen, household, other |
 | `recipes` | Recipe box | Add `origin` (manual, typed, link, photo, ai_found, ai_created), `site`, `photo_path`, cuisine, protein, notes; sale note and cost parked |
 | `recipe_ingredients` | What a recipe needs | Same |
 | `plans` / `plan_meals` | A week and its dinners | Same (day, recipe, locked, leftovers night) |

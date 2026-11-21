@@ -1,6 +1,6 @@
 // App state, rendering and every tap. Screens are plain functions that return markup.
 import * as data from './data.js';
-import { assemble, guessAisle, DAYS, DAY_SHORT } from './model.js';
+import { assemble, guessAisle, AISLES, DAYS, DAY_SHORT } from './model.js';
 import { esc, icon } from './ui.js';
 import { vPlan, vAddSheet } from './views/plan.js';
 import { vRecipes } from './views/recipes.js';
@@ -12,7 +12,7 @@ const S = {
   screen: 'loading', // loading | signin | nohousehold | app | error
   tab: 'plan', week: 0, filt: 'All', kept: {},
   add: null,         // Add dinner sheet: { mealId, step: 'menu' | 'box' | 'type', name, ing, err }
-  toast: '', newItem: '', newAisle: '', listErr: '',
+  toast: '', newItem: '', newAisle: '', listErr: '', moveItem: null,
   url: '', impErr: '', impMsg: '', email: '', signErr: '', busy: false, err: '', user: null,
 };
 let M = null;
@@ -105,6 +105,9 @@ function placeRecipe(recipeId) {
   setMeal(S.add.mealId, { recipe_id: recipeId, leftovers: false }, day => `${r.title} is on ${day}. Its ingredients are on the list.`);
 }
 
+// What to call a list item in messages: its ingredient's name, else its label.
+function itemName(it) { return rows.ingredients.find(i => i.id === it.ingredient_id)?.name || it.label; }
+
 // "1 1/2 lb chicken thighs, cut up" -> "Chicken thighs"
 const UNIT = /^\s*[\d¼½¾⅓⅔⅛.,\/\s-]*\s*(cups?|tbsps?|tsps?|tablespoons?|teaspoons?|lbs?|pounds?|oz|ounces?|g|grams?|kg|ml|l|liters?|cans?|bags?|packs?|packages?|boxes?|bunch(es)?|cloves?|heads?|jars?|bottles?|pieces?|slices?|sticks?)?\.?\s+(of\s+)?/i;
 function ingredientName(line) {
@@ -154,6 +157,18 @@ const ACTIONS = {
   done: id => { const it = rows.list_items.find(x => x.id === id); persist('list_items', id, { checked: !it.checked }); },
   haveit: id => { const it = rows.list_items.find(x => x.id === id); persist('list_items', id, { have_it: !it.have_it, checked: false }); },
   rmitem: id => { del('list_items', id); refresh(); },
+  moveitem: id => { S.moveItem = S.moveItem === id ? null : id; },
+  // The aisle is saved on the ingredient, so every list that uses it follows from now on.
+  aisleto: key => {
+    const it = rows.list_items.find(x => x.id === S.moveItem);
+    S.moveItem = null;
+    if (!it) return;
+    if (it.ingredient_id) {
+      persist('ingredients', it.ingredient_id, { aisle: key });
+      if (it.aisle) persist('list_items', it.id, { aisle: null });
+    } else persist('list_items', it.id, { aisle: key }); // items added before ingredients were linked
+    S.toast = `${itemName(it)} is in ${AISLES.find(a => a[0] === key)[1]} now. We'll remember that.`;
+  },
   units: v => setHousehold({ units: v }),
 };
 
@@ -189,9 +204,14 @@ const A = {
     const label = S.newItem.trim(), wk = M.weeks[S.week];
     if (!label) { S.listErr = 'Type something to add.'; return; }
     const pos = Math.max(-1, ...rows.list_items.filter(i => i.plan_id === wk.id).map(i => i.position)) + 1;
+    // Our own items get an ingredient too, so an aisle we chose before is remembered.
+    const name = label.charAt(0).toUpperCase() + label.slice(1);
+    let ing = rows.ingredients.find(i => i.name.toLowerCase() === label.toLowerCase());
+    if (!ing) ing = add('ingredients', { name, pantry_staple: false, aisle: S.newAisle || guessAisle(label) });
+    else if (S.newAisle && S.newAisle !== ing.aisle) bg(data.save('ingredients', ing.id, { aisle: S.newAisle }));
     add('list_items', {
-      plan_id: wk.id, ingredient_id: null, label, for_label: null, quantity: 1, checked: false, position: pos,
-      aisle: S.newAisle || guessAisle(label), have_it: false, custom: true,
+      plan_id: wk.id, ingredient_id: ing.id, label, for_label: null, quantity: 1, checked: false, position: pos,
+      have_it: false, custom: true,
     });
     S.newItem = ''; S.listErr = '';
     refresh();
@@ -212,7 +232,7 @@ const A = {
 };
 
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-keep],[data-pass],[data-filt],[data-done],[data-haveit],[data-rmitem],[data-units],[data-a]');
+  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-keep],[data-pass],[data-filt],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-units],[data-a]');
   if (!el || el.disabled) return;
   if (el.dataset.a === 'closeadd' && el.classList.contains('ov') && e.target.closest('[data-stop]')) return;
   S.toast = '';
@@ -241,6 +261,7 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   if (e.target.id === 'shot' && e.target.files[0]) { S.impErr = ''; S.impMsg = 'Reading recipes from screenshots is coming in a later update.'; render(); }
   if (e.target.id === 'newaisle') S.newAisle = e.target.value;
+  if (e.target.id === 'moveaisle') { S.toast = ''; ACTIONS.aisleto(e.target.value); render(); }
 });
 
 document.addEventListener('submit', async e => {

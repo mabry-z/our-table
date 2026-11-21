@@ -32,7 +32,7 @@ show prices, budget and store tags: keep their layout, drop those parts.
 | Dinners per week | 5 cooked + 2 leftovers nights (default) |
 | Budget and prices | None. Dropped Nov 21, 2026. Price and flyer work is parked (see build plan) |
 | Units | US by default, metric toggle |
-| Shopping list | One merged list grouped by aisle; Luke's usuals added every week |
+| Shopping list | One merged list grouped by aisle; Luke's usuals added every week. 17 specific aisles in store-walking order (AISLES in js/model.js; no catch-all "Pantry"); any item can be moved to another aisle and the app remembers it for that ingredient |
 | Kids | Luke (8) is a picky eater: his "usuals" (chicken nuggets, plain pasta, fried shrimp, fried chicken) are added to every list. Adeline (10) eats what we eat. |
 | Luke-friendly | Badge on dinners Luke can share (e.g. fried chicken, or pasta with a plain portion set aside) |
 | Filling the week | Mixed freely night by night: Add dinner (picks, recipe box, find a recipe, link, screenshot or photo, type it) or the Ask bar ("find me a lemon caper fish dish for Thursday", "plan next week"). AI only runs when asked |

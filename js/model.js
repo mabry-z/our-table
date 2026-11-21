@@ -5,21 +5,40 @@
 export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 export const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-// The order we walk the store, with the name shown on the list.
-export const AISLES = [['produce', 'Produce'], ['meat', 'Meat and seafood'], ['dairy', 'Dairy and eggs'],
-  ['bakery', 'Bakery'], ['pantry', 'Pantry'], ['frozen', 'Frozen'], ['other', 'Other']];
+// The order we walk the store, with the name shown on the list. Keep in step with the aisle
+// check in supabase/migrations/20261121140000_specific_aisles.sql.
+export const AISLES = [
+  ['produce', 'Produce'], ['bakery', 'Bakery and bread'], ['deli', 'Deli'], ['meat', 'Meat and poultry'],
+  ['seafood', 'Seafood'], ['dairy', 'Dairy and eggs'], ['pasta', 'Pasta, rice and grains'],
+  ['canned', 'Canned and jarred'], ['condiments', 'Condiments and sauces'], ['spices', 'Spices and seasonings'],
+  ['baking', 'Baking and oils'], ['breakfast', 'Breakfast and cereal'], ['snacks', 'Snacks'], ['drinks', 'Drinks'],
+  ['frozen', 'Frozen'], ['household', 'Household'], ['other', 'Other'],
+];
 
-// Best guess from a name for new ingredients and our own list items. Order matters: frozen
-// before meat (chicken nuggets), dried spices and broth before meat and produce (chicken
-// broth, garlic powder, dried basil), produce before dairy (eggplant).
+// Best guess from a name for new ingredients and our own list items; first match wins, so the
+// order matters (same rules as the specific_aisles migration):
+// frozen before meat (chicken nuggets), spices before produce (garlic powder, dried basil),
+// canned tomatoes and broth before produce and meat, pasta before dairy (egg noodles),
+// drinks and snacks before produce and bakery (orange juice, tortilla chips), breakfast
+// before dairy (peanut butter), produce before dairy (eggplant).
 const AISLE_GUESS = [
-  ['frozen', /(nugget|frozen|fried shrimp|fries|ice cream)/i],
-  ['pantry', /(broth|stock|bouillon|seasoning|dried|powder|flakes|paprika|cumin|cinnamon|nutmeg|vanilla|vinegar|honey|mustard|ketchup|mayo|soy sauce|black pepper|peppercorn)/i],
-  ['meat', /(chicken|beef|pork|sausage|turkey|bacon|ham|steak|schnitzel|shrimp|salmon|cod|fish|tuna)/i],
+  ['household', /(paper towel|toilet paper|napkin|foil|plastic wrap|trash bag|zip ?lock|ziploc|detergent|dish soap|sponge|tissue)/i],
+  ['frozen', /(nugget|frozen|fried shrimp|fries|ice cream|tater tot|popsicle)/i],
+  ['spices', /(seasoning|dried|powder|flakes|paprika|cumin|cinnamon|nutmeg|turmeric|cayenne|curry|bay lea|black pepper|peppercorn|\bsalt\b|\bspices?\b)/i],
+  ['condiments', /(ketchup|mustard|mayo|vinegar|soy sauce|hot sauce|bbq|barbecue|salsa|dressing|relish|pickle|worcestershire|sriracha|pasta sauce|marinara|pesto|teriyaki)/i],
+  ['baking', /(flour|sugar|baking|yeast|vanilla|chocolate chip|cocoa|cornstarch|\boil\b|shortening|honey|molasses|cake mix|brownie)/i],
+  ['canned', /(canned|\bcans?\b|tomato paste|tomato sauce|diced tomato|crushed tomato|broth|stock|bouillon)/i],
+  ['deli', /(deli|salami|pepperoni|prosciutto|lunch meat|rotisserie|hummus)/i],
+  ['seafood', /(shrimp|salmon|\bcod\b|fish|tuna|tilapia|crab|scallop|mussel|lobster)/i],
+  ['meat', /(chicken|beef|pork|sausage|turkey|bacon|\bham\b|steak|schnitzel|lamb|veal|meatball)/i],
+  ['drinks', /(juice|soda|coffee|\btea\b|sparkling water|lemonade)/i],
+  ['snacks', /(chips\b|cracker|cookie|pretzel|popcorn|\bnuts\b|almond)/i],
   ['produce', /(pepper|onion|potato|corn|tomato|lettuce|garlic|carrot|celery|apple|lemon|lime|cilantro|parsley|basil|thyme|rosemary|mint|dill|chive|sage|oregano|herb|ginger|scallion|shallot|leek|spinach|kale|arugula|cabbage|broccoli|cauliflower|zucchini|squash|pumpkin|eggplant|asparagus|mushroom|cucumber|avocado|green bean|peas|radish|beet|jalape|banana|orange|berr|grape|peach|pear|mango|pineapple|melon|fruit)/i],
-  ['dairy', /(milk|cheese|cheddar|parmesan|butter|cream|yogurt|egg)/i],
-  ['bakery', /(bread|bun|tortilla|roll|pita)/i],
-  ['pantry', /(pasta|penne|spätzle|spaetzle|noodle|rice|beans|flour|sugar|oil|sauce|can|spice|salt)/i],
+  ['pasta', /(pasta|penne|spaghetti|macaroni|spätzle|spaetzle|noodle|\brice\b|quinoa|couscous|lasagna|ramen|orzo)/i],
+  ['bakery', /(bread|\bbuns?\b|tortilla|\brolls?\b|pita|bagel|naan|croissant|english muffin)/i],
+  ['breakfast', /(cereal|\boats?\b|oatmeal|granola|pancake|waffle|syrup|peanut butter|\bjam\b|jelly)/i],
+  ['canned', /(beans|soup|coconut milk|olives)/i],
+  ['dairy', /(milk|cheese|cheddar|parmesan|mozzarella|butter|cream|yogurt|\beggs?\b)/i],
 ];
 export function guessAisle(name) {
   return (AISLE_GUESS.find(([, re]) => re.test(name)) || ['other'])[0];

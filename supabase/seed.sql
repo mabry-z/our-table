@@ -17,19 +17,19 @@ insert into public.stores (id, household_id, name, chain, currency, external_id,
 insert into public.ingredients (id, household_id, name, default_unit, pantry_staple, aisle) values
   ('0ca40c5a-5423-438c-a12a-03ce6bfc65ec', '4e305711-6464-4621-a4a2-138d007a26f5', 'Pork sausage', null, false, 'meat'),
   ('584b7427-e1e2-4241-a5f2-4d3b8da808a9', '4e305711-6464-4621-a4a2-138d007a26f5', 'Bell peppers', null, false, 'produce'),
-  ('ec52ed2c-ef4d-4cc4-a699-398c22691cbc', '4e305711-6464-4621-a4a2-138d007a26f5', 'Penne', null, false, 'pantry'),
+  ('ec52ed2c-ef4d-4cc4-a699-398c22691cbc', '4e305711-6464-4621-a4a2-138d007a26f5', 'Penne', null, false, 'pasta'),
   ('3dfeb04d-6c5e-49c3-adf0-d7c5a520a977', '4e305711-6464-4621-a4a2-138d007a26f5', 'Chicken breast', null, false, 'meat'),
-  ('5840fbfd-eb5a-4bad-a201-9355909a571d', '4e305711-6464-4621-a4a2-138d007a26f5', 'Black beans', null, false, 'pantry'),
-  ('63f86ea9-431c-43b7-a165-58e579f76377', '4e305711-6464-4621-a4a2-138d007a26f5', 'Taco seasoning', null, false, 'pantry'),
+  ('5840fbfd-eb5a-4bad-a201-9355909a571d', '4e305711-6464-4621-a4a2-138d007a26f5', 'Black beans', null, false, 'canned'),
+  ('63f86ea9-431c-43b7-a165-58e579f76377', '4e305711-6464-4621-a4a2-138d007a26f5', 'Taco seasoning', null, false, 'spices'),
   ('d49c0139-9c59-469f-a860-6a5db755d247', '4e305711-6464-4621-a4a2-138d007a26f5', 'Chicken thighs', null, false, 'meat'),
   ('37de36b7-165a-4e65-ae04-0ab71a5fffb1', '4e305711-6464-4621-a4a2-138d007a26f5', 'Potatoes', null, false, 'produce'),
   ('fdb9e7fd-ce66-4787-a1ea-e4f1d9533f1f', '4e305711-6464-4621-a4a2-138d007a26f5', 'Chicken drumsticks', null, false, 'meat'),
   ('09b0d85a-3e88-4d3c-ae43-64a2bcc32100', '4e305711-6464-4621-a4a2-138d007a26f5', 'Corn on the cob', null, false, 'produce'),
   ('e1b6bd35-3075-40a7-ac58-0b8deed8390b', '4e305711-6464-4621-a4a2-138d007a26f5', 'Pork schnitzel', null, false, 'meat'),
-  ('51232348-2a2c-4082-ac9a-24e4cce5e98a', '4e305711-6464-4621-a4a2-138d007a26f5', 'Spätzle', null, false, 'pantry'),
+  ('51232348-2a2c-4082-ac9a-24e4cce5e98a', '4e305711-6464-4621-a4a2-138d007a26f5', 'Spätzle', null, false, 'pasta'),
   ('d4e147d1-e9ee-4ab5-a822-2c853ad9bdc9', '4e305711-6464-4621-a4a2-138d007a26f5', 'Chicken nuggets', null, false, 'frozen'),
   ('f0d26fec-e7ea-4106-aa98-7564a65dd352', '4e305711-6464-4621-a4a2-138d007a26f5', 'Fried shrimp', null, false, 'frozen'),
-  ('1bae55a1-0f28-4c6d-a833-3f1175a4f1d5', '4e305711-6464-4621-a4a2-138d007a26f5', 'Pasta', null, false, 'pantry');
+  ('1bae55a1-0f28-4c6d-a833-3f1175a4f1d5', '4e305711-6464-4621-a4a2-138d007a26f5', 'Pasta', null, false, 'pasta');
 
 insert into public.products (id, household_id, store_id, name, brand, size_amount, size_unit, external_id, ean) values
   ('2dd37d64-e3de-42e6-adbe-f80cea690232', '4e305711-6464-4621-a4a2-138d007a26f5', '5592975e-4118-4c20-a023-1fc66244ba64', 'Pork sausage roll, 1 lb', null, null, null, null, null),
