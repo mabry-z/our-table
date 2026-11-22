@@ -36,7 +36,14 @@ const LEFTOVER_DAYS = [3, 7, 5, 1, 6, 2, 4];
 
 function refresh() { M = assemble(rows); }
 
+// The Ask bar's spot above the tabs. Made here if the page doesn't have it: right after an update a
+// phone can still have the old index.html cached for a few minutes.
+function dockEl() {
+  return $('dock') || $('app').insertBefore(Object.assign(document.createElement('div'), { id: 'dock', className: 'dock' }), $('tabs'));
+}
+
 function render() {
+  dockEl();
   const body = $('body');
   body.classList.toggle('nobar', S.screen !== 'app');
   $('tabs').innerHTML = '';
