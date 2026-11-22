@@ -162,7 +162,7 @@ export function sampleRows() {
   RECIPES.forEach(([k, title, time_min, tags, rating, status, cost_by_store, luke_note, sale_note], i) => R.recipes.push({
     id: uid('recipe:' + k), household_id: hh, title, source_url: null, servings: 4, time_min, tags, rating,
     steps: k === 'sausage_pasta' ? SAUSAGE_PASTA_STEPS : [], status, luke_note, sale_note, cost_by_store,
-    origin: 'manual', site: null, photo_path: null, cuisine: null, protein: null, notes: null,
+    origin: 'manual', site: null, photo_paths: [], cuisine: null, protein: null, notes: null,
     // newest first in the recipe box, in mockup order
     created_at: new Date(Date.parse('2026-10-26T12:00:00Z') - i * 60000).toISOString(),
   }));
@@ -177,7 +177,7 @@ export function sampleRows() {
     R.recipes.push({
       id, household_id: hh, title, source_url: url, servings: 4, time_min, tags: [], rating: null,
       steps: [], status: 'box', luke_note: null, sale_note: null, cost_by_store: {},
-      origin, site: url ? new URL(url).hostname.replace(/^www\./, '') : null, photo_path: null, cuisine: null, protein: null, notes: null,
+      origin, site: url ? new URL(url).hostname.replace(/^www\./, '') : null, photo_paths: [], cuisine: null, protein: null, notes: null,
       created_at: new Date(Date.parse('2026-11-17T12:00:00Z') + i * 86400000).toISOString(),
     });
     R.picks.push({ id: uid('pick:' + k), household_id: hh, recipe_id: id, added_by: null, added_at: new Date(Date.parse('2026-11-17T12:00:00Z') + i * 86400000).toISOString() });

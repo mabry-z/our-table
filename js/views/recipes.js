@@ -48,6 +48,15 @@ function vRecipe(S, M, r) {
     + `<button class="ib" data-a="editrecipe">${icon('pencil')} Edit</button>`
     + (r.source_url ? `<a class="ib" href="${esc(r.source_url)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none">${icon('external-link')} Original</a>` : '')
     + `</div>`;
+  const photos = r.photo_paths || [];
+  if (photos.length) {
+    h += `<div class="cd"><div class="ey" style="margin-bottom:8px">${photos.length > 1 ? 'Original photos · tap one' : 'Original photo · tap it'} to see it full size</div><div class="thumbs" style="margin:0">`
+      + photos.map((p, i) => {
+        const url = S.photoUrls[p]?.url;
+        return url ? `<button class="thumb" data-viewphoto="${esc(p)}" aria-label="Show photo ${i + 1} full size" style="padding:0;cursor:pointer"><img src="${esc(url)}" alt=""></button>`
+          : `<div class="thumb" style="display:flex;align-items:center;justify-content:center;color:var(--faint)">${icon('photo')}</div>`;
+      }).join('') + `</div></div>`;
+  }
   h += `<div class="cd"><div class="ey" style="margin-bottom:6px">Ingredients</div>`
     + (ings.length ? `<ul class="ul">${ings.map(l => `<li>${esc(l)}</li>`).join('')}</ul>`
       : `<div class="mu">No ingredients yet. Tap Edit to add them, so this dinner fills the shopping list.</div>`) + `</div>`;

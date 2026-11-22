@@ -123,7 +123,9 @@ before/after is in `mockups/readability.html`. Older mockups still show the earl
   Claude creates (labeled "Created for you").
 - Personal use only. If the app is ever public, store links and our own notes instead of full
   recipe text for site recipes.
-- Fridge photos are deleted after reading; recipe photos are kept with the recipe.
+- Fridge photos are deleted after reading; recipe photos are kept with the recipe (private
+  `recipe-photos` bucket at `<household>/<recipe>/<n>.jpg`, listed in `recipes.photo_paths`,
+  removed when the recipe is deleted). "Choose several" reads up to 10 screenshots, one recipe each.
 
 ## Build phases
 

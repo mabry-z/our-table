@@ -85,9 +85,13 @@ What the Ask bar does on each screen:
 
 ## Recipe sources
 
-- **Find** searches only free, well-tested sites: Allrecipes, Budget Bytes, Serious Eats, Simply
-  Recipes, BBC Good Food, King Arthur Baking. Editable in Settings ("Sites we like"). No NYT Cooking
-  (paywalled, and its terms don't allow automated copying).
+- **Find** searches only free sites tested (Nov 21, 2026) to work with both Anthropic's search and
+  the link reader: Alton Brown, Budget Bytes, RecipeTin Eats, BBC Good Food, King Arthur Baking,
+  Traeger, Pinch of Yum, Skinnytaste, Love and Lemons, Taste of Home, Sally's Baking Addiction and
+  Damn Delicious. Editable in Settings ("Sites we like"), which refuses sites known to block apps
+  (Allrecipes, Serious Eats, Simply Recipes, Southern Living, Food Network, The Kitchn, Delish,
+  Cookie and Kate; use Paste the recipe text for those). No NYT Cooking (paywalled, and its terms
+  don't allow automated copying).
 - **Create** and photo ideas are written by Claude, not copied from a site, and labeled "Created for
   you". Ratings after cooking ("Make again" / "Not for us") tell the planner which are keepers.
 - Fridge photos are deleted after reading; only the confirmed item list is kept, as what's on hand.
@@ -121,7 +125,7 @@ is dropped.
 | `households` | Defaults: portions (4), dinners per week, time limit, units, AI on/off, monthly AI limit, recipe sites | Add `ai_suggestions`, `ai_monthly_limit`, `recipe_sites`; budget, currency, stores and max stops parked |
 | `members` | Who can sign in | Same |
 | `ingredients` | Generic ingredient | Add `aisle`, guessed from the name and changeable from the list (remembered). 17 aisles since migration `specific_aisles`: produce, bakery and bread, deli, meat and poultry, seafood, dairy and eggs, pasta rice and grains, canned and jarred, condiments and sauces, spices and seasonings, baking and oils, breakfast and cereal, snacks, drinks, frozen, household, other |
-| `recipes` | Recipe box | Add `origin` (manual, typed, link, photo, ai_found, ai_created), `site`, `photo_path`, cuisine, protein, notes; sale note and cost parked |
+| `recipes` | Recipe box | Add `origin` (manual, typed, link, photo, ai_found, ai_created), `site`, `photo_paths` (list since migration `recipe_photos`; files in the `recipe-photos` bucket), cuisine, protein, notes; sale note and cost parked |
 | `recipe_ingredients` | What a recipe needs | Same |
 | `plans` / `plan_meals` | A week and its dinners | Same (day, recipe, locked, leftovers night) |
 | `picks` | This week's picks tray | New: recipe, added by, added at. Deleted when put on a night; unused picks stay |
@@ -177,8 +181,10 @@ the non-AI pieces come first so the app is useful sooner, and the finished app m
    sites that block the link reader, about 1¢) and screenshot or photo import (up to 4 pictures of
    one recipe, flags for anything unclear, about 2¢). Then Find (in the Add sheet, about 10–15¢,
    with "Add to <day>", "Save to picks" and narrowing chips) and Sites we like in Settings, with a
-   default list of 12 sites tested to work. Still to do: "Choose several" into picks, keeping
-   recipe photos. Plan: Edge function with the AI key, usage log and monthly
+   default list of 12 sites tested to work. Nov 22: "Choose several" (up to 10
+   screenshots, each read on its own into its own pick, checked over together) and recipe photos
+   kept with the recipe (private `recipe-photos` storage bucket, shown on the recipe page, deleted
+   with the recipe; migration `recipe_photos`). Plan: Edge function with the AI key, usage log and monthly
    limit; Find a recipe (search our list of sites, read the results with the phase 2 link importer)
    in the Add dinner sheet and on Recipes, with "Add to <day>", "Save" and narrowing chips;
    screenshot and photo import with the check-it-over card and flags; "Choose several" into picks;

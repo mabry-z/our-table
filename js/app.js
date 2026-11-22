@@ -14,6 +14,8 @@ const S = {
   tab: 'plan', week: 0, filt: 'All',
   add: null,         // Add sheet (see vAddSheet): { target, mealId, step, name, ing, url, pv, err }
   recipe: null, edit: null, pickOpen: null, aiSpent: null, lastFind: null,
+  many: null,        // "Choose several": [{ preview, media_type, data, st: new|wait|reading|done|fail, pv, name, err }]
+  photoUrls: {}, viewPhoto: null,   // recipe photo links by storage path; the photo shown full size
   pendingDel: null, swiped: null,   // recipe waiting out its Undo; recipe row swiped open
   page: null, newUsual: { label: '', qty: '' }, newSkip: '', newSite: '', setErr: '', // Settings sub-pages
   toast: '', newItem: '', newAisle: '', listErr: '', moveItem: null,
@@ -45,7 +47,22 @@ function render() {
   const view = { plan: vPlan, recipes: vRecipes, list: vList, settings: (s, m) => vSettings(s, m, data.mode, S.user) }[S.tab];
   body.innerHTML = (S.err ? `<div class="banner row"><span>${esc(S.err)}</span><button class="ib" data-a="dismiss" aria-label="Dismiss" style="border:none">${icon('x')}</button></div>` : '') + view(S, M);
   $('tabs').innerHTML = TABS.map(([k, i, l]) => `<button class="${S.tab === k ? 'a' : ''}" data-tab="${k}"${S.tab === k ? ' aria-current="page"' : ''}>${icon(i)}${l}</button>`).join('');
-  $('sheet').innerHTML = vAddSheet(S, M);
+  $('sheet').innerHTML = S.viewPhoto
+    ? `<div class="ov photo-view" data-a="closephoto"><img src="${esc(S.viewPhoto)}" alt="Recipe photo, full size"><button class="ib" data-a="closephoto" aria-label="Close">${icon('x')}</button></div>`
+    : vAddSheet(S, M);
+  if (S.tab === 'recipes' && S.recipe) loadPhotos(M.recipeById.get(S.recipe));
+}
+
+// Fetches links for a recipe's photos the first time its page shows (links last an hour).
+const PHOTO_LINK_MS = 50 * 60 * 1000;
+function loadPhotos(r) {
+  const want = (r?.photo_paths || []).filter(p => !S.photoUrls[p] || (S.photoUrls[p].at && Date.now() - S.photoUrls[p].at > PHOTO_LINK_MS));
+  if (!want.length) return;
+  want.forEach(p => { S.photoUrls[p] = { url: S.photoUrls[p]?.url || null, at: Date.now() }; }); // asked for; don't ask again
+  data.photoUrls(want).then(m => {
+    Object.entries(m).forEach(([p, url]) => { S.photoUrls[p] = { url, at: Date.now() }; });
+    if (S.recipe === r.id) render();
+  }).catch(e => console.error(e));
 }
 
 // Writes show at once and save in the background. On failure, say so.
@@ -149,11 +166,18 @@ function setIngredients(recipeId, list) {
   });
 }
 
-function saveRecipe({ title, origin, source_url = null, site = null, time_min = null, servings = null, steps = [], ing }) {
+// photos: the pictures it was read from, kept with it ({ data, preview } from js/photos.js).
+function saveRecipe({ title, origin, source_url = null, site = null, time_min = null, servings = null, steps = [], ing, photos = [] }) {
+  const id = data.newId();
+  const photo_paths = photos.map((_, i) => `${M.hh.id}/${id}/${i + 1}.jpg`);
   const recipe = add('recipes', {
-    title: title.charAt(0).toUpperCase() + title.slice(1), origin, status: 'box', source_url, site, time_min,
-    servings: servings || M.hh.portions, tags: [], steps, created_at: new Date().toISOString(),
+    id, title: title.charAt(0).toUpperCase() + title.slice(1), origin, status: 'box', source_url, site, time_min,
+    servings: servings || M.hh.portions, tags: [], steps, photo_paths, created_at: new Date().toISOString(),
   });
+  if (photos.length) {
+    photo_paths.forEach((p, i) => { S.photoUrls[p] = { url: photos[i].preview }; }); // shown before the upload finishes
+    bg(data.uploadPhotos(photo_paths, photos));
+  }
   setIngredients(recipe.id, ing);
   return recipe;
 }
@@ -183,6 +207,7 @@ function saveLink(toPicks) {
   const recipe = p.dupe ? rows.recipes.find(r => r.id === p.dupe) : saveRecipe({
     title: (a.name ?? p.title).trim() || p.title, origin: p.origin || 'link', source_url: p.source_url, site: p.site,
     time_min: p.time_min, servings: p.servings, steps: p.steps || [], ing: lines(a.ing ?? p.ingredients.join('\n')),
+    photos: a.from === 'photo' ? a.photos : [],
   });
   finishAdd(recipe, toPicks);
 }
@@ -228,6 +253,44 @@ function saveFound(i, toPicks) {
   }), toPicks);
 }
 
+// "Choose several": each screenshot is read on its own (two at a time) and becomes its own
+// recipe. The batch lives outside the sheet, so closing it mid-read loses nothing: opening
+// Screenshot or photo again shows it.
+const MAX_MANY = 10;
+async function readMany() {
+  const list = S.many;
+  list.forEach(x => { if (x.st === 'new') x.st = 'wait'; });
+  const next = async () => {
+    for (let x; (x = list.find(y => y.st === 'wait'));) {
+      x.st = 'reading'; render();
+      try { x.pv = await data.aiRecipe({ kind: 'photo', images: [{ media_type: x.media_type, data: x.data }] }); x.name = x.pv.title; x.st = 'done'; }
+      catch (e) { x.err = e.message; x.st = 'fail'; }
+      if (S.many !== list) return;
+      render();
+    }
+  };
+  await Promise.all([next(), next()]);
+  S.aiSpent = null;
+  if (S.many === list && !S.add) { S.toast = 'Your screenshots are read. Open Add › Screenshot or photo to check them over.'; render(); }
+}
+const manyBusy = () => !!S.many?.some(x => x.st === 'wait' || x.st === 'reading');
+
+// Saves every screenshot that was read: to the picks, or just to the box from Recipes.
+function saveMany() {
+  const ok = S.many.filter(x => x.st === 'done'), toBox = S.add.target === 'box';
+  ok.forEach(x => {
+    const p = x.pv, r = saveRecipe({
+      title: (x.name || '').trim() || p.title, origin: 'photo', source_url: p.source_url, site: p.site,
+      time_min: p.time_min, servings: p.servings, steps: p.steps || [], ing: p.ingredients, photos: [x],
+    });
+    if (!toBox) add('picks', { recipe_id: r.id, added_by: S.user?.id ?? null, added_at: new Date().toISOString() });
+  });
+  S.many = null; S.add = null;
+  refresh();
+  const n = ok.length === 1 ? '1 recipe is' : `${ok.length} recipes are`;
+  S.toast = toBox ? `${n} in the recipe box.` : `${n} in this week's picks.`;
+}
+
 async function loadSpent() {
   try { S.aiSpent = await data.aiSpent(); } catch (e) { console.error(e); S.aiSpent = { error: true }; }
   if (S.tab === 'settings') render();
@@ -262,6 +325,7 @@ function finishDelete() {
   rows.plan_meals.filter(m => m.recipe_id === p.id).forEach(m => { m.recipe_id = null; m.options = []; m.locked = false; plans.add(m.plan_id); });
   rows.picks = rows.picks.filter(x => x.recipe_id !== p.id);
   rows.recipe_ingredients = rows.recipe_ingredients.filter(x => x.recipe_id !== p.id);
+  bg(data.removePhotos(rows.recipes.find(x => x.id === p.id)?.photo_paths));
   del('recipes', p.id);
   refresh();
   plans.forEach(id => { if (!M.weeks.find(w => w.id === id)?.past) syncList(id); });
@@ -289,8 +353,10 @@ async function start() {
 }
 
 const ACTIONS = {
-  tab: v => { S.tab = v; S.add = null; S.recipe = null; S.edit = null; S.page = null; S.swiped = null; window.scrollTo(0, 0); if (v === 'settings') loadSpent(); },
+  tab: v => { S.tab = v; S.add = null; S.viewPhoto = null; S.recipe = null; S.edit = null; S.page = null; S.swiped = null; window.scrollTo(0, 0); if (v === 'settings') loadSpent(); },
   rmphoto: i => { S.add.photos.splice(Number(i), 1); },
+  rmmany: i => { S.many.splice(Number(i), 1); if (!S.many.length) S.many = null; },
+  viewphoto: path => { S.viewPhoto = S.photoUrls[path]?.url || null; },
   delrecipe: id => deleteRecipe(id),
   findput: i => saveFound(Number(i), false),
   findpick: i => saveFound(Number(i), true),
@@ -386,6 +452,14 @@ const A = {
     if (!a.photos?.length) { a.err = 'Choose a photo first.'; return; }
     await readRecipe(a, 'photo', () => data.aiRecipe({ kind: 'photo', images: a.photos.map(({ media_type, data: d }) => ({ media_type, data: d })) }), 'photo');
   },
+  manygo: () => {
+    if (manyBusy()) return;
+    S.many.forEach(x => { if (x.st === 'fail') Object.assign(x, { st: 'wait', err: '' }); });
+    readMany(); // runs on; each finished read re-renders
+  },
+  manysave: () => { if (!S.many?.some(x => x.st === 'done')) { S.add.err = 'None of these could be read yet.'; return; } saveMany(); },
+  manyclear: () => { if (!manyBusy()) S.many = null; },
+  closephoto: () => { S.viewPhoto = null; },
   savelink: () => saveLink(false),
   savepick: () => saveLink(true),
   closeadd: () => { S.add = null; },
@@ -507,10 +581,10 @@ document.addEventListener('pointerup', endSwipe);
 document.addEventListener('pointercancel', endSwipe);
 
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-rmphoto],[data-delrecipe],[data-rmusual],[data-rmskip],[data-findput],[data-findpick],[data-findmore],[data-rmsite],[data-units],[data-a]');
+  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-rmphoto],[data-rmmany],[data-viewphoto],[data-delrecipe],[data-rmusual],[data-rmskip],[data-findput],[data-findpick],[data-findmore],[data-rmsite],[data-units],[data-a]');
   if (!el || el.disabled) return;
   // Tapping outside the sheet closes it, except while it's searching or reading (the × still does).
-  if (el.dataset.a === 'closeadd' && el.classList.contains('ov') && (e.target.closest('[data-stop]') || S.add?.step === 'reading')) return;
+  if (el.dataset.a === 'closeadd' && el.classList.contains('ov') && (e.target.closest('[data-stop]') || S.add?.step === 'reading' || manyBusy())) return;
   if (justSwiped) return;                                          // the end of a swipe isn't a tap
   if (S.swiped && el.dataset.recipe) { S.swiped = null; render(); return; } // a tap closes an open row
   S.toast = '';
@@ -541,6 +615,7 @@ const FIELDS = { tyname: ['add', 'name'], tying: ['add', 'ing'], linkin: ['add',
 document.addEventListener('input', e => {
   const id = e.target.id, f = FIELDS[id];
   if (f && S[f[0]]) S[f[0]][f[1]] = e.target.value;
+  if (id.startsWith('many-name-') && S.many) S.many[Number(id.slice(10))].name = e.target.value;
   if (id === 'em') S.email = e.target.value;
   if (id === 'newitem') S.newItem = e.target.value;
   if (id === 'skip-in') S.newSkip = e.target.value;
@@ -552,6 +627,12 @@ document.addEventListener('change', async e => {
     const a = S.add, files = [...e.target.files].slice(0, 4 - (a.photos?.length || 0));
     a.err = '';
     try { for (const f of files) (a.photos ||= []).push(await shrinkImage(f)); } catch (err) { a.err = err.message; }
+    render();
+  }
+  if (e.target.id === 'manyin' && S.add) {
+    const room = MAX_MANY - (S.many?.length || 0), files = [...e.target.files].slice(0, room);
+    S.add.err = e.target.files.length > room ? `Up to ${MAX_MANY} at a time; the first ${room} were kept.` : '';
+    try { for (const f of files) (S.many ||= []).push({ ...(await shrinkImage(f)), st: 'new' }); } catch (err) { S.add.err = err.message; }
     render();
   }
   if (e.target.id === 'newaisle') S.newAisle = e.target.value;

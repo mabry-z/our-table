@@ -67,6 +67,41 @@ export function vPlan(S, M) {
   return h;
 }
 
+// "Choose several": the screenshots, then each one's recipe to check over before they're saved.
+function manyStep(S, a) {
+  const L = S.many, n = L.length, read = L.filter(x => x.st === 'done');
+  const busy = L.some(x => x.st === 'wait' || x.st === 'reading'), fresh = L.every(x => x.st === 'new');
+  const toBox = a.target === 'box';
+  let b = `<div class="mu" style="margin:0 2px 8px">${fresh ? `${n} ${n === 1 ? 'screenshot' : 'screenshots'}, one recipe each. ${toBox ? 'Each is saved to the recipe box.' : "Each becomes its own pick in this week's picks."}`
+    : busy ? `Read ${L.filter(x => x.st === 'done' || x.st === 'fail').length} of ${n}… You can close this; they keep reading.`
+      : 'Check them over. Fix a name here, or anything else later from the recipe’s Edit.'}</div>`;
+  b += L.map((x, i) => {
+    const thumb = `<div class="thumb" style="flex:none;width:56px;height:74px"><img src="${x.preview}" alt="Screenshot ${i + 1}"></div>`;
+    const rm = busy ? '' : `<button class="ib" data-rmmany="${i}" aria-label="Remove screenshot ${i + 1}" style="border:none;padding:4px;align-self:flex-start">${icon('x')}</button>`;
+    let body;
+    if (x.st === 'done') {
+      const p = x.pv;
+      body = `<div class="ey">${[p.site ? esc(p.site) : '', p.time_min ? p.time_min + ' min' : '', p.ingredients.length + ' ingredients', p.steps?.length ? p.steps.length + ' steps' : ''].filter(Boolean).join(' · ')}</div>`
+        + `<input class="in" id="many-name-${i}" aria-label="Name of recipe ${i + 1}" value="${esc(x.name ?? p.title)}" autocomplete="off" style="margin-top:4px">`
+        + (p.unclear || []).map(u => `<div class="banner" style="margin:6px 0 0">${icon('alert-circle')} ${esc(u)}</div>`).join('');
+    } else if (x.st === 'fail') body = `<div class="sf" style="font-size:16px">Couldn’t read this one</div><div class="mu">${esc(x.err)}</div>`;
+    else body = `<div class="sf" style="font-size:16px;color:var(--faint)">${x.st === 'reading' ? 'Claude is reading it…' : x.st === 'wait' ? 'Waiting its turn' : 'Ready to read'}</div>`;
+    return `<div class="cd${x.st === 'done' ? '' : ' ghost'}" style="display:flex;gap:10px;align-items:flex-start">${thumb}<div style="flex:1;min-width:0">${body}</div>${rm}</div>`;
+  }).join('');
+  const cost = read.reduce((s, x) => s + (x.pv.cost_usd || 0), 0), failed = L.filter(x => x.st === 'fail').length;
+  if (!busy && !fresh && cost) b += `<div class="mu" style="margin:0 2px 6px">Read by Claude · about ${Math.max(1, Math.round(cost * 100))}¢ in all</div>`;
+  b += `<div class="err">${esc(a.err || '')}</div>`;
+  if (fresh) {
+    b += (n < 10 ? `<label class="opt" style="cursor:pointer">${icon('photo-plus')}<span style="flex:1">Add more screenshots</span><input type="file" id="manyin" accept="image/*" multiple style="display:none"></label>` : '')
+      + `<button class="big dk" data-a="manygo">Read ${n === 1 ? 'it' : `all ${n}`} · about ${2 * n}¢</button>`;
+  } else if (!busy) {
+    b += (failed ? `<button class="ib" data-a="manygo" style="width:100%;justify-content:center;padding:10px;margin-top:6px">Try the ${failed === 1 ? 'one' : failed} that failed again</button>` : '')
+      + (read.length ? `<button class="big dk" data-a="manysave">${toBox ? `Save ${read.length} to the recipe box` : `Add ${read.length} to this week's picks`}</button>` : '');
+  }
+  if (!busy) b += `<button class="ib" data-a="manyclear" style="display:flex;margin:10px auto 0;border:none">Start over</button>`;
+  return b;
+}
+
 // The Add sheet, for a night, for This week's picks, or for the recipe box.
 // S.add = { target: 'meal' | 'picks' | 'box', mealId?, step, name, ing, url, pv, err }
 export function vAddSheet(S, M) {
@@ -117,11 +152,13 @@ export function vAddSheet(S, M) {
       + `<label class="lbl" for="pasteurl">Link to the original, optional</label><input class="in" id="pasteurl" type="url" inputmode="url" autocomplete="off" placeholder="allrecipes.com/recipe/…" value="${esc(a.url || '')}">`
       + `<div class="err">${esc(a.err || '')}</div><button class="big dk" data-a="textgo">Read it</button>`;
   }
-  if (a.step === 'photo') {
+  if (a.step === 'photo' && S.many) b += manyStep(S, a);
+  else if (a.step === 'photo') {
     const ph = a.photos || [];
     b += `<div class="mu" style="margin:0 2px 8px">Screenshots of a recipe page, a cookbook page, or a recipe card. Up to 4 pictures of one recipe, for example ingredients and steps.</div>`
       + (ph.length ? `<div class="thumbs">${ph.map((p, i) => `<div class="thumb"><img src="${p.preview}" alt="Picture ${i + 1}"><button class="ib" data-rmphoto="${i}" aria-label="Remove picture ${i + 1}">${icon('x')}</button></div>`).join('')}</div>` : '')
       + (ph.length < 4 ? `<label class="opt" style="cursor:pointer">${icon('photo-plus')}<span style="flex:1">${ph.length ? 'Add another picture' : 'Choose a screenshot or photo'}</span><input type="file" id="photoin" accept="image/*" multiple style="display:none"></label>` : '')
+      + (ph.length ? '' : `<label class="opt" style="cursor:pointer">${icon('photo-plus')}<span style="flex:1">Choose several<br><span class="mu">${a.target === 'box' ? 'Each screenshot becomes its own recipe' : 'Each screenshot becomes its own pick'} · about 2¢ each</span></span><input type="file" id="manyin" accept="image/*" multiple style="display:none"></label>`)
       + `<div class="err">${esc(a.err || '')}</div>`
       + (ph.length ? `<button class="big dk" data-a="photogo">Read ${ph.length > 1 ? 'them' : 'it'}</button>` : '');
   }

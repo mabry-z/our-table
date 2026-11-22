@@ -138,8 +138,35 @@ export async function aiSpent() {
   return { usd: data.reduce((a, r) => a + Number(r.cost_usd), 0), count: data.length };
 }
 
+// Recipe photos live in the private recipe-photos bucket at <household>/<recipe>/<n>.jpg
+// (migration recipe_photos). Sample mode keeps them in memory for the session.
+const BUCKET = 'recipe-photos';
+const samplePhotos = new Map();
+
+// Uploads after the recipe row is saved (same queue). photos: [{ data (base64), preview }].
+export function uploadPhotos(paths, photos) {
+  if (mode === 'sample') { paths.forEach((p, i) => samplePhotos.set(p, photos[i].preview)); return Promise.resolve(); }
+  return Promise.all(paths.map((p, i) => enqueue(c => c.storage.from(BUCKET)
+    .upload(p, new Blob([Uint8Array.from(atob(photos[i].data), ch => ch.charCodeAt(0))], { type: 'image/jpeg' }), { contentType: 'image/jpeg' })
+    .then(check))));
+}
+
+// Links good for an hour, as { path: url }.
+export async function photoUrls(paths) {
+  if (mode === 'sample') return Object.fromEntries(paths.map(p => [p, samplePhotos.get(p)]).filter(([, u]) => u));
+  const { data, error } = await (await client()).storage.from(BUCKET).createSignedUrls(paths, 3600);
+  if (error) throw error;
+  return Object.fromEntries(data.filter(d => d.signedUrl).map(d => [d.path, d.signedUrl]));
+}
+
+export function removePhotos(paths) {
+  if (!paths?.length) return Promise.resolve();
+  if (mode === 'sample') { paths.forEach(p => samplePhotos.delete(p)); return Promise.resolve(); }
+  return enqueue(c => c.storage.from(BUCKET).remove(paths).then(check));
+}
+
 // crypto.randomUUID only exists on https and localhost; phones testing over Wi-Fi use plain http.
-function newId() {
+export function newId() {
   if (crypto.randomUUID) return crypto.randomUUID();
   const b = crypto.getRandomValues(new Uint8Array(16));
   b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80;
