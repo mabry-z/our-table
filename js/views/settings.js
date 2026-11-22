@@ -19,15 +19,20 @@ export function vSettings(S, M, mode, user) {
     + row('Units', `<div class="sg">${['US', 'Metric'].map(u => `<button class="${hh.units === u ? 'a' : ''}" data-units="${u}">${u}</button>`).join('')}</div>`) + `</div>`;
   const limit = Number(hh.ai_monthly_limit ?? 10), sp = S.aiSpent;
   const used = sp && !sp.error ? sp.usd : null;
+  const on = hh.ai_suggestions !== false;
   h += `<div class="cd" style="padding:4px 14px"><div class="ey" style="padding:10px 0 4px">AI helper</div>`
-    + `<div style="padding:8px 0 10px"><div class="row"><span>This month</span><span class="sf" style="font-size:18px">${used == null ? (sp?.error ? 'Couldn’t load' : '…') : '$' + used.toFixed(2)} <span class="mu" style="font-family:Lato">of $${limit}</span></span></div>`
+    + `<div class="row" style="padding:8px 0 10px"><span>AI suggestions<br><span class="mu">${on ? 'The Ask bar shows on Plan, Recipes and recipe pages' : 'Off: no Ask bar. You build the week yourself'}</span></span>`
+    + `<button class="sw${on ? ' on' : ''}" data-a="toggleai" role="switch" aria-checked="${on}" aria-label="AI suggestions"></button></div>`
+    + `<div style="padding:8px 0 10px;border-top:1px solid var(--rule2)"><div class="row"><span>This month</span><span class="sf" style="font-size:18px">${used == null ? (sp?.error ? 'Couldn’t load' : '…') : '$' + used.toFixed(2)} <span class="mu" style="font-family:Lato">of $${limit}</span></span></div>`
     + `<div class="bar"><div style="width:${used == null ? 0 : Math.min(100, limit ? used / limit * 100 : 100).toFixed(0)}%"></div></div>`
     + `<div class="mu">${used == null ? '' : `${sp.count} ${sp.count === 1 ? 'request' : 'requests'} · `}resets on the 1st. When the limit is reached, AI reading pauses; everything else keeps working.</div></div>`
     + row('Monthly limit', stepper('lm', 'lp', '$' + limit, 'monthly AI limit'))
     + link('opensites', 'Sites we like', `${(hh.recipe_sites || []).length} sites`)
     + row('Finding a recipe', `<span class="mu">about 10–15¢ each</span>`)
     + row('Reading pasted text', `<span class="mu">about 1¢ each</span>`)
-    + row('Reading screenshots and photos', `<span class="mu">about 2¢ each</span>`) + `</div>`;
+    + row('Reading screenshots and photos', `<span class="mu">about 2¢ each</span>`, 'Stays on when AI suggestions are off')
+    + row('Ask: a week or a new recipe', `<span class="mu">about 5–12¢</span>`)
+    + row('Ask: a change or follow-up', `<span class="mu">about 3–6¢</span>`) + `</div>`;
   const people = [...M.members.values()].filter(Boolean);
   h += `<div class="cd" style="padding:4px 14px"><div class="ey" style="padding:10px 0 4px">Family</div>`
     + link('openusuals', "Luke's usuals", `${M.usuals.length} ${M.usuals.length === 1 ? 'item' : 'items'}`)

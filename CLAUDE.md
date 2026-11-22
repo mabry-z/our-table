@@ -70,6 +70,12 @@ Recipes and recipe pages (hidden when AI suggestions are off).
   that ourselves). Pages that can't be read come back as title + link. About 10–15¢ (measured Nov 21: 10–14¢; 4 searches at 1¢ plus 28–45K tokens of search results on Sonnet). Kept as is by choice; the browser plus Paste a link is the free route. Check callers with
   direct fetches to `/auth/v1/user`, not supabase-js `getUser` (it fails with this project's
   publishable key).
+- **Ask bar:** `js/views/ask.js` (bar, sheet, result cards) and the ask functions in `js/app.js`
+  send kind "ask" to `supabase/functions/ai` with the screen ("plan", "recipes", "recipe"), the
+  screen's context (the week's nights and the recipe box; the recipe), the last answer and earlier
+  asks. Claude Opus 5.5 answers with one card (`ASK_SCHEMA`): a week, found recipes (handed to
+  Find), a new recipe, a list of changes, ideas, or the items in a fridge photo (read by Sonnet).
+  Sample mode answers with canned cards (`sampleAsk` in `js/data.js`) so the sheet costs nothing to try.
 - **Recipe page and cook mode:** ingredients scaled by a portions control, steps, source link.
   "Start cooking" = one step per screen, large type, that step's ingredients, one-tap timers, screen
   kept awake (Wake Lock API), Luke reminder at the right step, rating at the end ("Make again" / "Not

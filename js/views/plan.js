@@ -2,13 +2,13 @@ import { DAYS } from '../model.js';
 import { esc, icon, lukePill, sourcePill, weekHead } from '../ui.js';
 
 // A site's own rating, e.g. "★ 4.8 · 1,200 ratings".
-function stars(r) {
+export function stars(r) {
   if (!r.rating) return '';
   return `<div class="rate">${icon('star-filled')} ${r.rating.toFixed(1)}${r.rating_count ? ` <span class="mu">· ${r.rating_count.toLocaleString('en-US')} ${r.rating_count === 1 ? 'rating' : 'ratings'}</span>` : ''}</div>`;
 }
 
 function addBtn(m) { return `<button class="ib" data-add="${m.id}">${icon('plus')} Add dinner</button>`; }
-const originIcon = r => (r.origin === 'photo' ? 'photo' : r.origin === 'link' || r.origin === 'ai_found' ? 'link' : r.origin === 'typed' ? 'pencil' : 'book');
+export const originIcon = r => (r.origin === 'photo' ? 'photo' : r.origin === 'link' || r.origin === 'ai_found' ? 'link' : r.origin === 'typed' ? 'pencil' : 'book');
 
 function mealCard(m, ro) {
   const day = DAYS[m.day - 1];
@@ -68,7 +68,7 @@ export function vPlan(S, M) {
 }
 
 // A Find result opened up before choosing it: what goes on the list and what the cooking involves.
-function foundRecipe(x) {
+export function foundRecipe(x) {
   const steps = (x.steps || []).map(s => (typeof s === 'string' ? s : [s.title, s.text].filter(Boolean).join(': ')));
   return `<div class="ey" style="margin:12px 0 4px">Ingredients · ${x.ingredients.length}</div><ul class="ul">${x.ingredients.map(l => `<li>${esc(l)}</li>`).join('')}</ul>`
     + `<div class="ey" style="margin:12px 0 4px">Steps${steps.length ? ' · ' + steps.length : ''}</div>`

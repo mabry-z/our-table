@@ -8,7 +8,7 @@ export const mode = SUPABASE_URL && SUPABASE_ANON_KEY && !new URLSearchParams(lo
   ? 'supabase' : 'sample';
 
 const TABLES = ['households', 'members', 'ingredients', 'recipes', 'recipe_ingredients', 'picks', 'plans',
-  'plan_meals', 'usuals', 'list_items'];
+  'plan_meals', 'usuals', 'list_items', 'pantry'];
 let sb = null;
 let rows = null;
 
@@ -127,6 +127,70 @@ export async function aiFind(query) {
     throw new Error(body?.error || 'Couldn’t reach the AI helper. Check your connection.');
   }
   return data;
+}
+
+// The Ask bar: one ask from the results sheet (see supabase/functions/ai, kind "ask"). Returns one
+// result card. Sample mode answers with simple keyword rules so the sheet can be tried for free.
+export async function aiAsk(req) {
+  if (mode === 'sample') {
+    await new Promise(r => setTimeout(r, 900));
+    return sampleAsk(req);
+  }
+  const { data, error } = await (await client()).functions.invoke('ai', { body: { kind: 'ask', ...req } });
+  if (error) {
+    const body = await error.context?.json?.().catch(() => null);
+    throw new Error(body?.error || 'Couldn’t reach the AI helper. Check your connection.');
+  }
+  return data;
+}
+
+const SAMPLE_NEW = {
+  title: 'Lemon Garlic Salmon and Rice', servings: 4, time_min: 25, luke_note: 'Plain rice and fish sticks for Luke',
+  ingredients: ['1 1/2 lb salmon fillets', '2 lemons', '4 cloves garlic', '1 1/2 cups jasmine rice', '2 tbsp butter', '1 bunch green onions'],
+  steps: ['Cook the rice.', 'Season the salmon with garlic, lemon zest, salt and pepper.', 'Roast at 425°F for 12 minutes.', 'Melt the butter with lemon juice and spoon over.'],
+};
+function sampleAsk({ ctx, q = '', context = {}, prev, photo }) {
+  const day = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'].findIndex(d => new RegExp(`\\b${d}`, 'i').test(q)) + 1 || null;
+  const none = { find_query: null, find_day: null, week: [], changed_days: [], recipes: [], changes: [], ideas: [], items: [], cost_usd: 0.05 };
+  if (photo) return { ...none, kind: 'seen', msg: "Here's what I can see. Tap anything that's wrong or used up, or tell me what I missed.", items: ['Chicken thighs', 'Bell peppers (3)', 'Half an onion', 'Rice', 'Canned tomatoes', 'Cheddar', 'Eggs', 'Greek yogurt'], cost_usd: 0.018 };
+  if (/\b(find|search|look for)\b/i.test(q) || (prev?.kind === 'found' && !/plan|make/i.test(q))) {
+    return aiFind(q).then(f => ({ kind: 'found', msg: `Searched your recipe sites for “${q}”.`, day: day || prev?.day || null, results: f.results, cost_usd: 0.15 }));
+  }
+  if (ctx === 'recipe') {
+    const r = context.recipe, ch = [...(prev?.changes || [])];
+    if (/dairy/i.test(q)) r.ingredients.filter(l => /cheese|cream|milk|butter|yogurt/i.test(l)).forEach(l => ch.push({ from: l, to: /butter/i.test(l) ? l.replace(/butter/i, 'olive oil') : null }));
+    if (/double/i.test(q)) ch.push({ from: null, to: `Doubled to ${(r.servings || 4) * 2} portions` });
+    if (!ch.length || ch.length === (prev?.changes || []).length) ch.push({ from: null, to: `Adjusted: “${q}”` });
+    const ing = r.ingredients.map(l => { const c = ch.find(x => x.from === l); return c ? c.to : l; }).filter(Boolean);
+    return { ...none, kind: 'changes', msg: 'Here is what changes. Nothing is saved until you choose.', changes: ch, recipes: [{ ...r, ingredients: ing, luke_note: r.luke_note || null }] };
+  }
+  if (ctx === 'recipes') {
+    if (prev?.kind === 'seen' && /idea/i.test(q)) return { ...none, kind: 'ideas', msg: `Three ideas using ${context.on_hand?.length || 0} of your items.`, ideas: [
+      { title: 'Chicken Fajita Rice Bowls', uses: 5, need: 'Nothing else to buy', luke: false },
+      { title: 'Cheesy Chicken and Pepper Bake', uses: 4, need: 'Nothing else to buy', luke: true },
+      { title: 'Shakshuka with Peppers', uses: 4, need: 'Feta, optional', luke: false }] };
+    const base = prev?.kind === 'recipe' ? prev.recipes[0] : { ...SAMPLE_NEW, title: /make this/i.test(q) ? q.replace(/^make this:\s*/i, '') : 'Sheet-Pan Pork with Apples and Potatoes' };
+    const changes = prev?.kind === 'recipe' ? [...(prev.changes || []), { from: null, to: /mild/i.test(q) ? 'Spices cut back; plain portion set aside for Luke' : `Adjusted: “${q}”` }] : [];
+    return { ...none, kind: 'recipe', msg: prev?.kind === 'recipe' ? 'Updated the recipe.' : 'Here’s a new one, written for your family.', recipes: [base], changes };
+  }
+  // Plan: fill open nights from the box, with one new idea; a named night changes just that night.
+  const box = context.box || [], nights = context.nights || [];
+  const from = prev?.kind === 'week' ? prev.week : nights.map(n => ({ day: n.day, kind: 'keep', recipe_id: n.recipe_id || null, title: n.title || '' }));
+  let bi = 0, changed = [];
+  const week = from.map((n, i) => {
+    const night = nights[i] || {};
+    if (night.state === 'locked') return { day: n.day, kind: 'keep', recipe_id: night.recipe_id, title: night.title };
+    if (day && n.day !== day) return n;
+    if (/leftover/i.test(q) && day) { changed.push(n.day); return { day: n.day, kind: 'leftovers', recipe_id: null, title: 'Leftovers night' }; }
+    if (day && /fish|salmon/i.test(q)) { changed.push(n.day); return { day: n.day, kind: 'new', recipe_id: null, title: SAMPLE_NEW.title }; }
+    if (prev?.kind === 'week' && !day) return n;
+    if (night.state !== 'open' && !day) return n;
+    const b = box[bi++ % Math.max(1, box.length)];
+    changed.push(n.day);
+    return i === 4 || !b ? { day: n.day, kind: 'new', recipe_id: null, title: SAMPLE_NEW.title } : { day: n.day, kind: 'box', recipe_id: b.id, title: b.title };
+  });
+  return { ...none, kind: 'week', msg: changed.length ? 'From your box, plus one new idea. Locked nights stay put.' : "I wasn't sure which night to change. Try naming a day.", week, changed_days: changed,
+    recipes: week.some(n => n.kind === 'new') ? [SAMPLE_NEW] : [] };
 }
 
 // This month's AI spending for the household (the log is read-only from the app).

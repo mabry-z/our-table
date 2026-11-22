@@ -194,6 +194,10 @@ the non-AI pieces come first so the app is useful sooner, and the finished app m
 4. **The Ask bar.** Results sheet with trail and undo, reusing phase 3's Find; Plan (find for a
    named night, propose a week, change a night); Recipes (create, fridge photo → ideas → recipe);
    recipe page tweaks.
+   Built Nov 22, 2026: the Ask bar and results sheet (`js/views/ask.js`) and kind "ask" in the `ai`
+   edge function (Opus 5.5 with one structured result card per ask; searches handed to Find; fridge
+   photos read by Sonnet and the confirmed items saved to `pantry`); AI suggestions switch in
+   Settings; migration `ask_bar` (usage log kinds, which also fixes pasted-text reads not being logged).
    - Done when: the Ask bar proposes a week we'd actually cook.
 5. **Cook mode and learning.** Cook mode with timers, Wake Lock and Luke reminders; ratings shaping
    suggestions; move, skip and freshness check mid-week; pantry from photos feeding "use what we

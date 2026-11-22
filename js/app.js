@@ -1,8 +1,9 @@
 // App state, rendering and every tap. Screens are plain functions that return markup.
 import * as data from './data.js';
 import { assemble, guessAisle, AISLES, DAYS, DAY_SHORT } from './model.js';
-import { esc, icon } from './ui.js';
+import { esc, icon, weekOf } from './ui.js';
 import { vPlan, vAddSheet } from './views/plan.js';
+import { vAskBar, vAskSheet, ASK_CTX, ASK_CAP, askDay } from './views/ask.js';
 import { vRecipes, editFields } from './views/recipes.js';
 import { vList } from './views/list.js';
 import { vSettings } from './views/settings.js';
@@ -16,6 +17,7 @@ const S = {
   recipe: null, edit: null, pickOpen: null, aiSpent: null, lastFind: null,
   many: null,        // "Choose several": [{ preview, media_type, data, st: new|wait|reading|done|fail, pv, name, err }]
   photoUrls: {}, viewPhoto: null,   // recipe photo links by storage path; the photo shown full size
+  ask: null, askKept: null, askFocus: false, // the Ask sheet (see js/views/ask.js); the last one closed
   pendingDel: null, swiped: null,   // recipe waiting out its Undo; recipe row swiped open
   page: null, newUsual: { label: '', qty: '' }, newSkip: '', newSite: '', setErr: '', // Settings sub-pages
   toast: '', newItem: '', newAisle: '', listErr: '', moveItem: null,
@@ -39,6 +41,8 @@ function render() {
   body.classList.toggle('nobar', S.screen !== 'app');
   $('tabs').innerHTML = '';
   $('sheet').innerHTML = '';
+  $('dock').innerHTML = '';
+  body.classList.remove('withask');
   if (S.screen === 'loading') { body.innerHTML = `<div class="mu" style="text-align:center;margin-top:40vh">Loading</div>`; return; }
   if (S.screen === 'signin') { body.innerHTML = vSignin(S, data.mode); return; }
   if (S.screen === 'nohousehold') { body.innerHTML = vNoHousehold(S.user); return; }
@@ -49,7 +53,13 @@ function render() {
   $('tabs').innerHTML = TABS.map(([k, i, l]) => `<button class="${S.tab === k ? 'a' : ''}" data-tab="${k}"${S.tab === k ? ' aria-current="page"' : ''}>${icon(i)}${l}</button>`).join('');
   $('sheet').innerHTML = S.viewPhoto
     ? `<div class="ov photo-view" data-a="closephoto"><img src="${esc(S.viewPhoto)}" alt="Recipe photo, full size"><button class="ib" data-a="closephoto" aria-label="Close">${icon('x')}</button></div>`
-    : vAddSheet(S, M);
+    : S.ask ? vAskSheet(S, M) : vAddSheet(S, M);
+  const ctx = askCtx();
+  if (ctx) {
+    $('dock').innerHTML = vAskBar(ctx);
+    $('dock').style.bottom = $('tabs').offsetHeight + 'px';
+    body.classList.add('withask');
+  }
   if (S.tab === 'recipes' && S.recipe) loadPhotos(M.recipeById.get(S.recipe));
 }
 
@@ -179,11 +189,11 @@ function setIngredients(recipeId, list) {
 }
 
 // photos: the pictures it was read from, kept with it ({ data, preview } from js/photos.js).
-function saveRecipe({ title, origin, source_url = null, site = null, time_min = null, servings = null, steps = [], ing, photos = [] }) {
+function saveRecipe({ title, origin, source_url = null, site = null, time_min = null, servings = null, steps = [], ing, photos = [], luke_note = null }) {
   const id = data.newId();
   const photo_paths = photos.map((_, i) => `${M.hh.id}/${id}/${i + 1}.jpg`);
   const recipe = add('recipes', {
-    id, title: title.charAt(0).toUpperCase() + title.slice(1), origin, status: 'box', source_url, site, time_min,
+    id, title: title.charAt(0).toUpperCase() + title.slice(1), origin, status: 'box', source_url, site, time_min, luke_note,
     servings: servings || M.hh.portions, tags: [], steps, photo_paths, created_at: new Date().toISOString(),
   });
   if (photos.length) {
@@ -305,6 +315,193 @@ function saveMany() {
   S.toast = toBox ? `${n} in the recipe box.` : `${n} in this week's picks.`;
 }
 
+// Starts a week: seven open nights, with the household's leftovers nights. Returns its id.
+function startWeek(idx) {
+  const plan = add('plans', { week_start: M.weeks[idx].week_start });
+  const lo = LEFTOVER_DAYS.slice(0, M.hh.leftovers_per_week);
+  for (let d = 1; d <= 7; d++) add('plan_meals', { plan_id: plan.id, day: d, recipe_id: null, options: [], locked: false, leftovers: lo.includes(d) });
+  syncList(plan.id);
+  refresh();
+  return plan.id;
+}
+
+// The Ask bar ---------------------------------------------------------------------------------
+// Which Ask the current screen offers, if any: the week on Plan (not a past one), the recipe box,
+// or a recipe's page. None when AI suggestions are off in Settings.
+function askCtx() {
+  if (S.screen !== 'app' || M.hh.ai_suggestions === false) return null;
+  if (S.tab === 'plan') return M.weeks[S.week]?.past ? null : 'plan';
+  if (S.tab === 'recipes') return S.recipe ? (S.edit || !M.recipeById.get(S.recipe) ? null : 'recipe') : 'recipes';
+  return null;
+}
+
+// An Ask closed with answers comes back if it's opened again on the same screen within half an
+// hour, so closing the sheet (even mid-ask) never wastes one.
+function openAsk() {
+  const ctx = askCtx(), k = S.askKept;
+  if (k && k.ctx === ctx && k.recipeId === (S.recipe || null) && k.weekIdx === S.week && Date.now() - k.at < KEEP_FIND_MS) { S.ask = k; S.askKept = null; }
+  else {
+    const wk = M.weeks[S.week];
+    S.ask = { ctx, weekIdx: S.week, recipeId: S.recipe || null, trail: [], draft: '', photo: null, err: '', loading: false, at: Date.now(),
+      label: ctx === 'plan' ? weekOf(wk.week_start) : ctx === 'recipe' ? M.recipeById.get(S.recipe).title : 'Recipes' };
+  }
+  S.askFocus = true;
+}
+function closeAsk() { if (S.ask?.trail.length || S.ask?.loading) S.askKept = S.ask; S.ask = null; }
+
+const recipeLines = id => rows.recipe_ingredients.filter(ri => ri.recipe_id === id).sort((a, b) => a.position - b.position)
+  .map(ri => ri.note || rows.ingredients.find(i => i.id === ri.ingredient_id)?.name || '');
+const stepText = s => (typeof s === 'string' ? s : [s.title, s.text].filter(Boolean).join(': '));
+
+// What the AI needs to know about the screen the ask came from.
+function askContext(k, last) {
+  const hh = M.hh, base = { portions: hh.portions, luke_usuals: M.usuals.map(u => u.label) };
+  if (k.ctx === 'recipe') {
+    const r = M.recipeById.get(k.recipeId);
+    return { ...base, recipe: { title: r.title, servings: r.servings, time_min: r.time_min, luke_note: r.luke_note, ingredients: recipeLines(r.id), steps: (r.steps || []).map(stepText) } };
+  }
+  const box = M.recipes.filter(r => r.status === 'box');
+  if (k.ctx === 'recipes') return { ...base, box_titles: box.map(r => r.title), on_hand: k.onHand || [] };
+  const wk = M.weeks[k.weekIdx], lo = LEFTOVER_DAYS.slice(0, hh.leftovers_per_week);
+  const nights = DAYS.map((name, i) => {
+    const m = wk.meals?.find(x => x.day === i + 1);
+    if (!m) return { day: i + 1, name, state: lo.includes(i + 1) ? 'leftovers' : 'open' };
+    return { day: i + 1, name, state: m.locked ? 'locked' : m.recipe ? 'planned' : m.leftovers ? 'leftovers' : 'open', recipe_id: m.recipe_id, title: m.recipe?.title };
+  });
+  return {
+    ...base, week: weekOf(wk.week_start), nights, leftovers_per_week: hh.leftovers_per_week, weeknight_time_limit_min: hh.time_limit_min,
+    box: box.slice(0, 120).map(r => ({ id: r.id, title: r.title, time_min: r.time_min, rating: r.rating, luke_note: r.luke_note, tags: r.tags,
+      ingredients: recipeLines(r.id).slice(0, 12).map(l => ingredientName(l)) })),
+  };
+}
+
+// The last answer, as sent back with the next ask (just what the AI needs to build on it).
+function askPrev(r) {
+  if (!r) return null;
+  if (r.kind === 'found') return { kind: 'found', query: r.query, day: r.day, titles: r.results.map(x => x.title) };
+  const { kind, msg, week, changed_days, recipes, changes, ideas } = r;
+  return { kind, msg, week, changed_days, recipes, changes, ideas, items: r.kind === 'seen' ? r.items.filter((_, i) => !(r.off || []).includes(i)) : r.items };
+}
+
+async function askSend(text) {
+  const k = S.ask, q = (text ?? k.draft ?? '').trim();
+  if (k.loading || k.trail.length >= ASK_CAP) return;
+  if (!q && !k.photo) { k.err = 'Type what you’d like first.'; return; }
+  const last = k.trail.at(-1)?.r;
+  const req = { ctx: k.ctx, q, context: askContext(k, last), prev: askPrev(last), asks: k.trail.map(t => t.q) };
+  if (k.photo) req.photo = { media_type: k.photo.media_type, data: k.photo.data };
+  const hadPhoto = !!k.photo;
+  Object.assign(k, { loading: true, err: '', draft: '' });
+  render();
+  let r;
+  try { r = await data.aiAsk(req); } catch (e) { Object.assign(k, { loading: false, err: e.message, draft: q }); render(); return; }
+  (r.recipes || []).forEach(x => { x.title = titleCase(x.title); });
+  (r.week || []).forEach(n => {
+    if (n.kind === 'new') n.title = titleCase(n.title);
+    n.was = req.context.nights?.[n.day - 1]?.state; // what a "keep" night is, even before the week is started
+  });
+  // On a follow-up, "keep" means the night as last proposed (a locked night stays locked either way).
+  if (r.kind === 'week' && last?.kind === 'week') {
+    r.week = r.week.map(n => {
+      const p = last.week.find(x => x.day === n.day);
+      return n.kind === 'keep' && p && n.was !== 'locked' ? { ...p } : n;
+    });
+    for (const n of r.week) {
+      if (n.kind === 'new' && !r.recipes.some(x => x.title === n.title)) {
+        const x = last.recipes.find(y => y.title === n.title);
+        if (x) r.recipes.push(x);
+      }
+    }
+  }
+  (r.ideas || []).forEach(x => { x.title = titleCase(x.title); });
+  (r.results || []).forEach(x => { x.title = titleCase(x.title); });
+  k.trail.push({ q: q || 'What can I make with this?', photo: hadPhoto, r });
+  Object.assign(k, { loading: false, photo: null, at: Date.now() });
+  S.aiSpent = null;
+  if (S.ask !== k) { S.toast = 'Your ask is answered. Tap the Ask bar to see it.'; }
+  render();
+  if ($('askbody')) $('askbody').scrollTop = 0;
+}
+
+// Saves a recipe the AI wrote (or a found one), reusing the box's copy of a found link.
+function saveAsked(x, found) {
+  if (found) {
+    const have = rows.recipes.find(r => r.source_url && r.source_url === x.source_url);
+    return have || saveRecipe({ title: x.title, origin: 'ai_found', source_url: x.source_url, site: x.site, time_min: x.time_min, servings: x.servings, steps: x.steps || [], ing: x.ingredients });
+  }
+  return saveRecipe({ title: x.title, origin: 'ai_created', time_min: x.time_min, servings: x.servings, luke_note: x.luke_note || null,
+    steps: (x.steps || []).map(s => ({ text: s })), ing: x.ingredients });
+}
+const lastAnswer = () => S.ask.trail.at(-1).r;
+
+// Puts a proposed week on the plan: locked nights and "keep" nights stay; new ideas are saved
+// to the recipe box once each, as "Created for you".
+function useWeek() {
+  const k = S.ask, r = lastAnswer();
+  const planId = M.weeks[k.weekIdx].id || startWeek(k.weekIdx);
+  const made = new Map();
+  for (const n of r.week) {
+    const m = rows.plan_meals.find(x => x.plan_id === planId && x.day === n.day);
+    if (!m || m.locked || n.kind === 'keep') continue;
+    let patch;
+    if (n.kind === 'box' && rows.recipes.some(x => x.id === n.recipe_id)) patch = { recipe_id: n.recipe_id, leftovers: false };
+    else if (n.kind === 'new') {
+      const x = r.recipes.find(y => y.title === n.title);
+      if (!x) continue;
+      if (!made.has(x.title)) made.set(x.title, saveAsked(x).id);
+      patch = { recipe_id: made.get(x.title), leftovers: false };
+    } else if (n.kind === 'leftovers') patch = { recipe_id: null, leftovers: true };
+    else if (n.kind === 'open') patch = { recipe_id: null, leftovers: false };
+    else continue;
+    bg(data.save('plan_meals', m.id, { options: [], locked: false, ...patch }));
+  }
+  syncList(planId);
+  refresh();
+  S.ask = null; S.askKept = null;
+  S.week = k.weekIdx; S.tab = 'plan'; S.recipe = null;
+  S.toast = `The week is set${made.size ? `, with ${made.size === 1 ? 'one new idea' : made.size + ' new ideas'} saved to the recipe box` : ''}. Its ingredients are on the list.`;
+}
+
+// A found recipe goes on the night it was asked for (or the first open one).
+function askPut(i) {
+  const k = S.ask, r = lastAnswer(), x = r.results[i], day = askDay(M.weeks[k.weekIdx], r);
+  const planId = M.weeks[k.weekIdx].id || startWeek(k.weekIdx);
+  const m = rows.plan_meals.find(y => y.plan_id === planId && y.day === day);
+  const recipe = saveAsked(x, true);
+  bg(data.save('plan_meals', m.id, { options: [], locked: false, recipe_id: recipe.id, leftovers: false }));
+  syncList(planId);
+  refresh();
+  (r.done ||= {})[i] = `Added to ${DAYS[day - 1]}`;
+}
+
+// Changes on a recipe's page: a new copy, or the recipe itself rewritten (planned lists follow).
+function askChanges(replace) {
+  const k = S.ask, r = lastAnswer(), x = r.recipes?.[0], old = M.recipeById.get(k.recipeId);
+  if (!x) { k.err = 'There’s nothing to save yet.'; return; }
+  S.ask = null; S.askKept = null;
+  if (replace) {
+    persist('recipes', old.id, { title: x.title, servings: x.servings || old.servings, time_min: x.time_min ?? old.time_min, luke_note: x.luke_note ?? old.luke_note, steps: x.steps.map(text => ({ text })) });
+    setIngredients(old.id, x.ingredients);
+    refresh(); resyncRecipe(old.id); refresh();
+    S.toast = 'Recipe updated. Planned weeks’ lists follow.';
+    return;
+  }
+  const copy = saveRecipe({ title: x.title.toLowerCase() === old.title.toLowerCase() ?`${old.title} (Our Version)` : x.title, origin: old.origin, source_url: old.source_url, site: old.site,
+    time_min: x.time_min, servings: x.servings, luke_note: x.luke_note, steps: x.steps.map(text => ({ text })), ing: x.ingredients });
+  refresh();
+  S.recipe = copy.id;
+  S.toast = 'Saved as a copy. The original is unchanged.';
+}
+
+// What's on hand from a fridge photo replaces the last photo's list.
+function savePantry(items) {
+  rows.pantry.filter(p => p.source === 'photo').forEach(p => del('pantry', p.id));
+  items.forEach(label => {
+    const ing = rows.ingredients.find(x => x.name.toLowerCase() === ingredientName(label).toLowerCase());
+    add('pantry', { ingredient_id: ing?.id ?? null, label, source: 'photo', updated_at: new Date().toISOString() });
+  });
+}
+
 async function loadSpent() {
   try { S.aiSpent = await data.aiSpent(); } catch (e) { console.error(e); S.aiSpent = { error: true }; }
   if (S.tab === 'settings') render();
@@ -367,9 +564,18 @@ async function start() {
 }
 
 const ACTIONS = {
-  tab: v => { S.tab = v; S.add = null; S.viewPhoto = null; S.recipe = null; S.edit = null; S.page = null; S.swiped = null; window.scrollTo(0, 0); if (v === 'settings') loadSpent(); },
+  tab: v => { S.tab = v; S.add = null; S.viewPhoto = null; if (S.ask) closeAsk(); S.recipe = null; S.edit = null; S.page = null; S.swiped = null; window.scrollTo(0, 0); if (v === 'settings') loadSpent(); },
   rmphoto: i => { S.add.photos.splice(Number(i), 1); },
   rmmany: i => { S.many.splice(Number(i), 1); if (!S.many.length) S.many = null; },
+  // The Ask sheet's buttons (js/views/ask.js)
+  askstarter: i => { S.ask.draft = ASK_CTX[S.ask.ctx].starters[Number(i)][1]; S.askFocus = true; },
+  askback: i => { S.ask.trail = S.ask.trail.slice(0, Number(i) + 1); },
+  asksee: i => { const r = lastAnswer(); r.seen = r.seen === Number(i) ? null : Number(i); },
+  askput: i => askPut(Number(i)),
+  askpick: i => { const r = lastAnswer(); addPick(saveAsked(r.results[Number(i)], true).id); (r.done ||= {})[i] = 'In the picks'; },
+  askbox: i => { const r = lastAnswer(); saveAsked(r.results[Number(i)], true); refresh(); (r.done ||= {})[i] = 'Saved to the recipe box'; },
+  askmake: i => askSend(`Make this: ${lastAnswer().ideas[Number(i)].title}`),
+  askseen: i => { const r = lastAnswer(), n = Number(i); r.off = (r.off || []).includes(n) ? r.off.filter(x => x !== n) : [...(r.off || []), n]; },
   viewphoto: path => { S.viewPhoto = S.photoUrls[path]?.url || null; },
   delrecipe: id => deleteRecipe(id),
   findput: i => saveFound(Number(i), false),
@@ -432,15 +638,7 @@ const ACTIONS = {
 
 const A = {
   tolist: () => { S.tab = 'list'; window.scrollTo(0, 0); },
-  startweek: () => {
-    const wk = M.weeks[S.week];
-    const plan = add('plans', { week_start: wk.week_start });
-    const lo = LEFTOVER_DAYS.slice(0, M.hh.leftovers_per_week);
-    for (let d = 1; d <= 7; d++) add('plan_meals', { plan_id: plan.id, day: d, recipe_id: null, options: [], locked: false, leftovers: lo.includes(d) });
-    syncList(plan.id);
-    refresh();
-    S.toast = 'Week started. Add a dinner to each open night.';
-  },
+  startweek: () => { startWeek(S.week); S.toast = 'Week started. Add a dinner to each open night.'; },
   leftovers: () => setMeal(S.add.mealId, { recipe_id: null, leftovers: true }, day => `${day} is a leftovers night.`),
   typego: () => {
     const name = (S.add.name || '').trim();
@@ -475,6 +673,24 @@ const A = {
   manysave: () => { if (!S.many?.some(x => x.st === 'done')) { S.add.err = 'None of these could be read yet.'; return; } saveMany(); },
   manyclear: () => { if (!manyBusy()) S.many = null; },
   closephoto: () => { S.viewPhoto = null; },
+  askopen: () => openAsk(),
+  askclose: () => closeAsk(),
+  asksend: () => askSend(),
+  askfresh: () => { Object.assign(S.ask, { trail: [], err: '', onHand: null }); S.askFocus = true; },
+  askrmphoto: () => { S.ask.photo = null; },
+  askuseweek: () => useWeek(),
+  askcopy: () => askChanges(false),
+  askreplace: () => askChanges(true),
+  asksavepick: () => { const r = lastAnswer(); addPick(saveAsked(r.recipes[0]).id); (r.done ||= {}).pick = "Saved to the box and this week's picks"; },
+  asksavebox: () => { const r = lastAnswer(); saveAsked(r.recipes[0]); refresh(); (r.done ||= {}).box = 'Saved to the recipe box'; },
+  askideas: () => {
+    const r = lastAnswer(), items = r.items.filter((_, i) => !(r.off || []).includes(i));
+    if (!items.length) { S.ask.err = 'Keep at least one item.'; return; }
+    S.ask.onHand = items;
+    savePantry(items);
+    return askSend('Show ideas from these items');
+  },
+  toggleai: () => setHousehold({ ai_suggestions: M.hh.ai_suggestions === false }),
   savelink: () => saveLink(false),
   savepick: () => saveLink(true),
   closeadd: () => { S.add = null; },
@@ -596,10 +812,12 @@ document.addEventListener('pointerup', endSwipe);
 document.addEventListener('pointercancel', endSwipe);
 
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-rmphoto],[data-rmmany],[data-viewphoto],[data-delrecipe],[data-rmusual],[data-rmskip],[data-findput],[data-findpick],[data-findsee],[data-findmore],[data-rmsite],[data-units],[data-a]');
+  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-rmphoto],[data-rmmany],[data-viewphoto],[data-askstarter],[data-askback],[data-asksee],[data-askput],[data-askpick],[data-askbox],[data-askmake],[data-askseen],[data-delrecipe],[data-rmusual],[data-rmskip],[data-findput],[data-findpick],[data-findsee],[data-findmore],[data-rmsite],[data-units],[data-a]');
   if (!el || el.disabled) return;
   // Tapping outside the sheet closes it, except while it's searching or reading (the × still does).
   if (el.dataset.a === 'closeadd' && el.classList.contains('ov') && (e.target.closest('[data-stop]') || S.add?.step === 'reading' || manyBusy())) return;
+  if (el.dataset.a === 'askclose' && el.classList.contains('ov') && (e.target.closest('[data-stop]') || S.ask?.loading)) return;
+  if (el.dataset.a === 'askopen' && e.target.closest('label')) return; // the bar's camera: the photo opens the sheet
   if (justSwiped) return;                                          // the end of a swipe isn't a tap
   if (S.swiped && el.dataset.recipe) { S.swiped = null; render(); return; } // a tap closes an open row
   S.toast = '';
@@ -609,6 +827,7 @@ document.addEventListener('click', async e => {
   if (S.screen !== 'loading') render();
   if (S.add?.step === 'type' && !S.add.name) $('tyname')?.focus();
   if (S.add?.step === 'link' && !S.add.url) $('linkin')?.focus();
+  if (S.ask && S.askFocus) { S.askFocus = false; const a = $('askin'); a?.focus(); a?.setSelectionRange(a.value.length, a.value.length); }
 });
 
 // Keyboard: list items are role="checkbox"; Enter adds a list item or reads a link.
@@ -617,6 +836,8 @@ document.addEventListener('keydown', async e => {
   if (e.key === 'Enter' && e.target.id === 'newitem') { e.preventDefault(); A.additem(); render(); $('newitem')?.focus(); }
   if (e.key === 'Enter' && e.target.id === 'linkin') { e.preventDefault(); await A.linkgo(); render(); }
   if (e.key === 'Enter' && e.target.id === 'findin') { e.preventDefault(); await A.findgo(); render(); }
+  if (e.key === 'Enter' && e.target.id === 'askin') { e.preventDefault(); await askSend(); render(); }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('.askbar')) { e.preventDefault(); openAsk(); render(); $('askin')?.focus(); }
   if (e.key === 'Enter' && (e.target.id === 'us-qty' || e.target.id === 'us-label')) { e.preventDefault(); A.addusual(); render(); $('us-label')?.focus(); }
   if (e.key === 'Enter' && e.target.id === 'skip-in') { e.preventDefault(); A.addskip(); render(); $('skip-in')?.focus(); }
   if (e.key === 'Enter' && e.target.id === 'site-in') { e.preventDefault(); A.addsite(); render(); $('site-in')?.focus(); }
@@ -624,7 +845,7 @@ document.addEventListener('keydown', async e => {
 
 // Typing is kept in state, so a re-render never loses it.
 const FIELDS = { tyname: ['add', 'name'], tying: ['add', 'ing'], linkin: ['add', 'url'], pvtitle: ['add', 'name'], pving: ['add', 'ing'],
-  pastetext: ['add', 'text'], pasteurl: ['add', 'url'], findin: ['add', 'q'],
+  pastetext: ['add', 'text'], pasteurl: ['add', 'url'], findin: ['add', 'q'], askin: ['ask', 'draft'],
   'ed-title': ['edit', 'title'], 'ed-time': ['edit', 'time'], 'ed-serves': ['edit', 'serves'], 'ed-luke': ['edit', 'luke'],
   'ed-ing': ['edit', 'ing'], 'ed-steps': ['edit', 'steps'], 'us-label': ['newUsual', 'label'], 'us-qty': ['newUsual', 'qty'] };
 document.addEventListener('input', e => {
@@ -649,6 +870,17 @@ document.addEventListener('change', async e => {
     S.add.err = e.target.files.length > room ? `Up to ${MAX_MANY} at a time; the first ${room} were kept.` : '';
     try { for (const f of files) (S.many ||= []).push({ ...(await shrinkImage(f)), st: 'new' }); } catch (err) { S.add.err = err.message; }
     render();
+  }
+  // A fridge photo for Ask, from the bar's camera, the starter or the sheet's camera.
+  if (/^askphoto/.test(e.target.id) && e.target.files[0]) {
+    if (!S.ask) openAsk();
+    const k = S.ask;
+    if (k.trail.length && !k.loading) Object.assign(k, { trail: [], onHand: null }); // a new photo starts fresh
+    try { k.photo = await shrinkImage(e.target.files[0]); k.err = ''; } catch (err) { k.err = err.message; }
+    if (!k.draft) k.draft = 'What can I make with this?';
+    S.askFocus = true;
+    render();
+    if (S.askFocus) { S.askFocus = false; $('askin')?.focus(); }
   }
   if (e.target.id === 'newaisle') S.newAisle = e.target.value;
   if (e.target.id === 'moveaisle') { S.toast = ''; ACTIONS.aisleto(e.target.value); render(); }

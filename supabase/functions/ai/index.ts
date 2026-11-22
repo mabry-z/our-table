@@ -8,6 +8,10 @@
 //   POST {"kind": "find", "query": "lemon caper fish"}
 //     200 {"results": [{...recipe, "why"} | {"title", "url", "site", "why", "readable": false}], "cost_usd"}
 //     Searches only the household's recipe sites, then reads each page with import-recipe.
+//   POST {"kind": "ask", "ctx": "plan" | "recipes" | "recipe", "q": "...", "context": {...}, "prev": {last answer},
+//         "asks": ["earlier asks"], "photo"?: {"media_type", "data"}}
+//     200 one result card: {"kind": "week" | "found" | "recipe" | "changes" | "ideas" | "seen" | "none", "msg", ..., "cost_usd"}
+//     The Ask bar (see ask() below).
 //     422 {"error"} when it isn't a recipe; 429 {"error"} when the monthly limit is reached
 //
 // Only signed-in members of a household may call it. The Claude key never leaves this function.
@@ -175,7 +179,7 @@ const RECIPE_SCHEMA = {
 };
 
 const INSTRUCTIONS = `You are reading a recipe for a family's meal-planning app. Copy what is there; don't invent.
-- title: the recipe's name, in sentence case.
+- title: the recipe's name, in title case.
 - servings: how many it serves, if stated. time_min: total time in minutes, if stated.
 - ingredients: one line each, with the amount and unit as written ("2 tbsp olive oil"). Use US spelling.
   If a section header like "For the sauce" appears, skip the header and keep its ingredients.
@@ -183,6 +187,163 @@ const INSTRUCTIONS = `You are reading a recipe for a family's meal-planning app.
 - unclear: short notes for anything you had to guess or couldn't read, in plain words a cook would understand,
   e.g. 'The card says "1 can" of broth; read as 14 oz.' Leave empty when everything is clear.
 - is_recipe: false if there is no recipe here (then leave the rest empty).`;
+
+// The Ask bar ---------------------------------------------------------------------------------
+// One ask from the results sheet: the words, the screen it came from (with what's on it), the last
+// answer and the earlier asks, so "milder" or "make Friday fish" builds on what's shown. The
+// answer is always one card type. Opus plans, creates and changes; a search is handed to Find
+// (Sonnet); a fridge photo is read by Sonnet.
+const ASK_MODEL = "claude-opus-5-5";
+const MAX_CONTEXT = 60_000; // characters of JSON for the screen's context and the last answer
+
+const ASK_RECIPE = {
+  type: "object", additionalProperties: false,
+  required: ["title", "servings", "time_min", "ingredients", "steps", "luke_note"],
+  properties: {
+    title: { type: "string" },
+    servings: { anyOf: [{ type: "integer" }, { type: "null" }] },
+    time_min: { anyOf: [{ type: "integer" }, { type: "null" }] },
+    ingredients: { type: "array", items: { type: "string" } },
+    steps: { type: "array", items: { type: "string" } },
+    luke_note: { anyOf: [{ type: "string" }, { type: "null" }] },
+  },
+};
+const ASK_SCHEMA = {
+  type: "object", additionalProperties: false,
+  required: ["kind", "msg", "find_query", "find_day", "week", "changed_days", "recipes", "changes", "ideas", "items"],
+  properties: {
+    kind: { type: "string", enum: ["week", "find", "recipe", "changes", "ideas", "seen", "none"] },
+    msg: { type: "string" },
+    find_query: { anyOf: [{ type: "string" }, { type: "null" }] },
+    find_day: { anyOf: [{ type: "integer" }, { type: "null" }] },
+    week: { type: "array", items: {
+      type: "object", additionalProperties: false, required: ["day", "kind", "recipe_id", "title"],
+      properties: {
+        day: { type: "integer" },
+        kind: { type: "string", enum: ["keep", "box", "new", "leftovers", "open"] },
+        recipe_id: { anyOf: [{ type: "string" }, { type: "null" }] },
+        title: { type: "string" },
+      } } },
+    changed_days: { type: "array", items: { type: "integer" } },
+    recipes: { type: "array", items: ASK_RECIPE },
+    changes: { type: "array", items: {
+      type: "object", additionalProperties: false, required: ["from", "to"],
+      properties: { from: { anyOf: [{ type: "string" }, { type: "null" }] }, to: { anyOf: [{ type: "string" }, { type: "null" }] } } } },
+    ideas: { type: "array", items: {
+      type: "object", additionalProperties: false, required: ["title", "uses", "need", "luke"],
+      properties: { title: { type: "string" }, uses: { type: "integer" }, need: { type: "string" }, luke: { type: "boolean" } } } },
+    items: { type: "array", items: { type: "string" } },
+  },
+};
+
+const ASK_RULES = `You are the AI helper in a family's meal-planning app. You answer one ask at a time with one result card, never a chat reply.
+The family: two adults and two kids. Adeline (10) eats what the adults eat. Luke (8) is a picky eater; his usual foods are listed in the context. A dinner is "Luke-friendly" when he can share it, e.g. fried chicken, or pasta with a plain portion set aside; say how in luke_note ("Plain pasta for Luke"), else null.
+Each dinner makes the household's portions (in the context) so there are leftovers. Never use the foods the family skips.
+Write everything in plain, warm, short sentences. Sentence case. No emoji. US units and spelling.
+msg: one or two sentences saying what you did ("Three from your box and one new idea. Tuesday and Friday share the peppers."). If you couldn't do something, say so plainly and why.
+
+Recipes you write (recipes[]): real, well-balanced home cooking that works the first time. title in title case. ingredients: one line each with amount and unit ("1 1/2 lb chicken thighs", "2 tbsp olive oil"), nothing for salt, pepper and water unless amounts matter. steps: one instruction each, in order, no numbers. If Luke needs his portion set aside, say so in the step where it happens. time_min: total time.
+
+Leave every field that doesn't apply empty ([] or null).`;
+
+const ASK_SCREENS: Record<string, string> = {
+  plan: `The ask comes from the Plan screen. The context has the week's seven nights (1 = Monday) with what's on each, and the recipe box.
+- To plan or re-plan the week, or change nights ("plan next week, light on pasta", "make Friday fish", "Thursday leftovers", "swap Tuesday"): kind "week". week[] has all seven nights:
+  "keep" = leave the night as it is now (always for locked nights, and for nights the ask doesn't touch when changing an earlier proposal or a planned week),
+  "box" = a recipe from the box (recipe_id from the box, title its title), "new" = a new idea you write (full recipe in recipes[], same title),
+  "leftovers" = leftovers night, "open" = nothing.
+  Fill open nights. Keep the same number of leftovers nights unless asked. Prefer recipes from the box, rated ones first, and vary proteins and cuisines; add at most two new ideas unless asked for more. Weeknight dinners (Mon-Thu) should fit the time limit. Sharing ingredients between nights is good; say so in msg.
+  When the last answer was a week, start from it: change only what the new ask is about. changed_days lists the nights you changed this time.
+- To find real recipes online ("find me a lemon caper fish dish for Thursday"), or when the ask is clearly a search: kind "find", find_query = a short search for the dish with the asked details ("lemon caper fish, under 30 minutes"), find_day = the night if named, else null.`,
+  recipes: `The ask comes from the Recipes screen. The context lists the titles already in the recipe box.
+- To make up a new recipe ("make something with pork, apples and potatoes", "a sheet-pan dinner with chicken and rice"): kind "recipe", one recipe in recipes[].
+  When the last answer was a recipe and the ask adjusts it ("milder", "double it", "slow cooker"), return the whole revised recipe and list what changed in changes[] (from: the old line or null, to: the new line or null, or a short sentence like "Moved to the slow cooker, 6 hours on low").
+- To find real recipes online ("find a crockpot chili Luke might eat", then "no dairy"): kind "find", find_query = a short search combining the earlier search with the new detail.
+- When the last answer was the items seen in a fridge photo and the ask adds or removes items: kind "seen", items[] = the updated list.
+- When asked for ideas from what's on hand (the context lists the items): kind "ideas", three ideas[] (uses = how many of the items it uses, need = what else to buy or "Nothing else to buy", luke = Luke-friendly).
+- When asked to make one of those ideas: kind "recipe" with that recipe, built around the items on hand.`,
+  recipe: `The ask comes from a recipe's page. The context has the recipe.
+- To change it ("make it dairy-free", "no cilantro", "double it", "use ground turkey", "make it milder for Luke"): kind "changes". changes[] lists every change against the recipe in the context, including earlier asks in this sheet: from = the original ingredient or step (null for something added), to = what it becomes (null if it's left out). recipes[] = the whole revised recipe, with steps updated to match.
+  When the last answer was changes, keep those and add the new ones.`,
+};
+
+const SEEN_SCHEMA = { type: "object", additionalProperties: false, required: ["items"], properties: { items: { type: "array", items: { type: "string" } } } };
+
+type Who = { userId: string; householdId: string; limit: number; sites: string[]; skip: string[] };
+async function ask(authorization: string, who: Who, body: Record<string, any>) {
+  const ctx = String(body.ctx ?? "");
+  if (!ASK_SCREENS[ctx]) return json({ error: "Unknown screen." }, 400);
+  const q = String(body.q ?? "").trim().slice(0, 500);
+  const context = JSON.stringify(body.context ?? {});
+  const prev = body.prev ? JSON.stringify(body.prev) : "";
+  if (context.length + prev.length > MAX_CONTEXT) return json({ error: "That's too much to send in one ask. Start fresh and try again." }, 400);
+  const asks = (Array.isArray(body.asks) ? body.asks : []).slice(-6).map((a: unknown) => String(a).slice(0, 300));
+  const photo = body.photo as { media_type?: string; data?: string } | undefined;
+  if (!q && !photo) return json({ error: "Type what you'd like first." }, 400);
+
+  if (await spentThisMonth(authorization, who.householdId) >= who.limit) {
+    return json({ error: `This month's AI limit of $${who.limit.toFixed(2)} is reached. It resets on the 1st; you can raise it in Settings.` }, 429);
+  }
+  const log = (kind: string, m: { model: string; usage: { input_tokens: number; output_tokens: number } }) => {
+    const [pin, pout] = PRICES[m.model] ?? [5, 25];
+    const cost = (m.usage.input_tokens * pin + m.usage.output_tokens * pout) / 1e6;
+    return logUse({ household_id: who.householdId, user_id: who.userId, kind, model: m.model,
+      input_tokens: m.usage.input_tokens, output_tokens: m.usage.output_tokens, cost_usd: Math.round(cost * 10000) / 10000 }).then(() => cost);
+  };
+  const create = (model: string, effort: string, schema: unknown, system: string | undefined, content: Anthropic.Beta.BetaContentBlockParam[], max = 16000) =>
+    anthropic.beta.messages.create({
+      model, max_tokens: max, betas: ["server-side-fallback-2026-07-01"], fallbacks: "default",
+      output_config: { effort, format: { type: "json_schema", schema } },
+      ...(system ? { system } : {}), messages: [{ role: "user", content }],
+    } as Anthropic.Beta.MessageCreateParamsNonStreaming);
+  const parsed = (m: Anthropic.Beta.BetaMessage) => {
+    const b = m.content.find((x) => x.type === "text");
+    return b && b.type === "text" ? JSON.parse(b.text) : null;
+  };
+
+  // A fridge or pantry photo: list what's in it. The photo isn't kept.
+  if (photo) {
+    if (!/^image\/(jpeg|png|webp)$/.test(photo.media_type ?? "") || !photo.data || photo.data.length > MAX_IMAGE_B64) {
+      return json({ error: "That photo couldn't be used. Try another." }, 400);
+    }
+    const m = await create(MODEL, "low", SEEN_SCHEMA, undefined, [
+      { type: "image", source: { type: "base64", media_type: photo.media_type as "image/jpeg", data: photo.data } },
+      { type: "text", text: `List the foods you can see in this fridge, pantry or counter photo that could go into a dinner: one short name each, with a count or amount in parentheses when it's clear ("Bell peppers (3)", "Half an onion"). Leave out condiments and drinks unless they're a main ingredient. Sentence case.${q ? `\nThe family adds: "${q}"` : ""}` },
+    ], 2000);
+    const cost = await log("fridge", m);
+    const r = parsed(m);
+    if (m.stop_reason === "refusal" || !r?.items?.length) return json({ error: "We couldn't make out any food in that photo. Try another, or type what you have." }, 422);
+    return json({ kind: "seen", msg: "Here's what I can see. Tap anything that's wrong or used up, or tell me what I missed.", items: r.items, cost_usd: Math.round(cost * 1000) / 1000 });
+  }
+
+  const skip = who.skip.length ? who.skip.join(", ") : "none";
+  const text = `${ASK_SCREENS[ctx]}
+
+Foods the family skips: ${skip}.
+The screen's context:
+<context>${context}</context>
+${prev ? `The answer showing now (the last ask's result):\n<last_answer>${prev}</last_answer>\n` : ""}${asks.length ? `Earlier asks in this sheet, oldest first:\n${asks.map((a: string) => `- ${a}`).join("\n")}\n` : ""}
+The ask: "${q}"`;
+  const kindOf = (k: string) => (ctx === "plan" ? "plan" : ctx === "recipe" ? "tweak" : k === "ideas" ? "ideas" : "create");
+  const m = await create(ASK_MODEL, "medium", ASK_SCHEMA, ASK_RULES, [{ type: "text", text }]);
+  const r = parsed(m);
+  let cost = await log(kindOf(r?.kind ?? ""), m);
+  if (m.stop_reason === "refusal") return json({ error: "Claude couldn't help with that one. Try other words." }, 422);
+  if (m.stop_reason === "max_tokens" || !r) return json({ error: "That answer ran too long. Try asking for less at once." }, 422);
+
+  if (r.kind === "find") {
+    const f = await find(authorization, who, String(r.find_query || q).slice(0, 200));
+    if (f.cost != null) {
+      await logUse({ household_id: who.householdId, user_id: who.userId, kind: "find", model: f.model,
+        input_tokens: f.input, output_tokens: f.output, cost_usd: Math.round(f.cost * 10000) / 10000 });
+      cost += f.cost;
+    }
+    if (f.error) return json({ error: f.error }, f.status ?? 400);
+    if (!f.results?.length) return json({ error: "Nothing matched on your sites. Try different words." }, 422);
+    return json({ kind: "found", msg: r.msg, query: r.find_query, day: r.find_day, results: f.results, cost_usd: Math.round(cost * 1000) / 1000 });
+  }
+  return json({ ...r, cost_usd: Math.round(cost * 1000) / 1000 });
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: CORS });
@@ -194,6 +355,13 @@ Deno.serve(async (req) => {
   if (!who.householdId) return json({ error: "Your account isn't part of a household." }, 403);
 
   const body = await req.json().catch(() => ({}));
+
+  if (body.kind === "ask") {
+    try { return await ask(authorization, who as Who, body); } catch (e) {
+      console.error("ai ask:", e);
+      return json({ error: "The AI helper had a problem. Try again in a minute." }, 502);
+    }
+  }
 
   if (body.kind === "find") {
     const query = String(body.query ?? "").trim().slice(0, 200);

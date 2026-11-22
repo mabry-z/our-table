@@ -133,7 +133,7 @@ export function sampleRows() {
       recipe_sites: RECIPE_SITES,
     }],
     members: [], stores: [], ingredients: [], products: [], prices: [], ingredient_matches: [],
-    recipes: [], recipe_ingredients: [], picks: [], plans: [], plan_meals: [], usuals: [], list_items: [],
+    recipes: [], recipe_ingredients: [], picks: [], plans: [], plan_meals: [], usuals: [], list_items: [], pantry: [],
     exchange_rates: [{ rate_date: '2026-10-26', base: 'EUR', quote: 'USD', rate: RATE, source: 'sample' }],
   };
 
