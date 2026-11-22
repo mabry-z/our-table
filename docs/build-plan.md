@@ -176,7 +176,7 @@ the non-AI pieces come first so the app is useful sooner, and the finished app m
    with "have it", our own items and a remembered aisle change; Luke's usuals on every list.
    A page without recipe data says so; the Claude fallback for those comes in phase 3.
    - Done when: we plan and shop a real week from the app without any AI.
-3. **Find, photos and the AI groundwork.** First part built Nov 21, 2026: the `ai` edge function
+3. **Find, photos and the AI groundwork.** Done Nov 22, 2026 (tested on a real week). Built Nov 21-22: the `ai` edge function
    (Claude Sonnet 5.5, usage log, monthly limit in Settings), "Paste the recipe text" (added for
    sites that block the link reader, about 1¢) and screenshot or photo import (up to 4 pictures of
    one recipe, flags for anything unclear, about 2¢). Then Find (in the Add sheet, about 10–15¢,

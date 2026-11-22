@@ -130,10 +130,12 @@ before/after is in `mockups/readability.html`. Older mockups still show the earl
 ## Build phases
 
 1. Foundation: done.
-2. Build a week by hand (build order only; the finished app mixes both): schema changes, recipe box,
-   link import, Add dinner, This week's picks, recipe page, list by aisle with editing, Luke's usuals.
-3. Find, photos and AI groundwork: edge function, usage log and monthly limit, Find a recipe (in Add
-   dinner and on Recipes, with "Add to <day>"), screenshot and photo import with flags, AI settings.
+2. Build a week by hand: done (build order only; the finished app mixes both). Schema changes,
+   recipe box, link import, Add dinner, This week's picks, recipe page, list by aisle with editing,
+   Luke's usuals.
+3. Find, photos and AI groundwork: done Nov 22, 2026. Edge function, usage log and monthly limit,
+   Find a recipe (in Add dinner and on Recipes, with "Add to <day>" and See recipe), screenshot
+   and photo import with flags, Choose several, kept recipe photos, AI settings.
 4. The Ask bar: results sheet with trail and undo, reusing Find; plan, create, fridge photo, tweak.
 5. Cook mode and learning: cook mode, ratings shaping suggestions, move / skip / freshness, pantry.
 
