@@ -67,6 +67,15 @@ export function vPlan(S, M) {
   return h;
 }
 
+// A Find result opened up before choosing it: what goes on the list and what the cooking involves.
+function foundRecipe(x) {
+  const steps = (x.steps || []).map(s => (typeof s === 'string' ? s : [s.title, s.text].filter(Boolean).join(': ')));
+  return `<div class="ey" style="margin:12px 0 4px">Ingredients · ${x.ingredients.length}</div><ul class="ul">${x.ingredients.map(l => `<li>${esc(l)}</li>`).join('')}</ul>`
+    + `<div class="ey" style="margin:12px 0 4px">Steps${steps.length ? ' · ' + steps.length : ''}</div>`
+    + (steps.length ? `<ol class="ul">${steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>` : `<div class="mu">The site didn't list the steps; they're on the original page.</div>`)
+    + (x.source_url ? `<a class="ib" href="${esc(x.source_url)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none;margin-top:10px">${icon('external-link')} Open on ${esc(x.site || 'the site')}</a>` : '');
+}
+
 // "Choose several": the screenshots, then each one's recipe to check over before they're saved.
 function manyStep(S, a) {
   const L = S.many, n = L.length, read = L.filter(x => x.st === 'done');
@@ -139,7 +148,9 @@ export function vAddSheet(S, M) {
         + a.found.map((x, i) => x.readable
           ? `<div class="cd">${stars(x)}<div class="ey">${[esc(x.site), x.time_min ? x.time_min + ' min' : '', x.ingredients.length + ' ingredients'].filter(Boolean).join(' · ')}</div>`
             + `<div class="sf" style="font-size:18px;line-height:1.25;margin-top:2px">${esc(x.title)}</div>${x.why ? `<div class="mu" style="margin-top:2px">${esc(x.why)}</div>` : ''}`
-            + `<div class="acts">${a.target === 'meal' ? `<button class="ib" data-findpick="${i}">Save to picks</button>` : ''}<button class="ib dk" data-findput="${i}">${put}</button></div></div>`
+            + (a.seen === i ? foundRecipe(x) : '')
+            + `<div class="acts"><button class="ib" data-findsee="${i}" aria-expanded="${a.seen === i}">${icon(a.seen === i ? 'chevron-up' : 'list-details')} ${a.seen === i ? 'Hide recipe' : 'See recipe'}</button>`
+            + `${a.target === 'meal' ? `<button class="ib" data-findpick="${i}">Save to picks</button>` : ''}<button class="ib dk" data-findput="${i}">${put}</button></div></div>`
           : `<div class="cd ghost"><div class="ey">${esc(x.site)}</div><div class="sf" style="font-size:17px;line-height:1.25;margin-top:2px">${esc(x.title)}</div>`
             + `<div class="mu" style="margin-top:4px">This site doesn't let apps read it. Open it, copy the recipe, and use Paste the recipe text.</div>`
             + `<div class="acts"><a class="ib" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none">${icon('external-link')} Open</a></div></div>`).join('')

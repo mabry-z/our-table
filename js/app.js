@@ -152,6 +152,18 @@ function ingredientName(line) {
   const n = bare.replace(UNIT, '').split(/,|\s[–—-]\s/)[0].trim() || line.trim();
   return n.charAt(0).toUpperCase() + n.slice(1);
 }
+// Names of recipes we import: "one-pot chili mac with beans" -> "One-Pot Chili Mac with Beans".
+// Small words stay lowercase unless first or last; capitals already there (BBQ, McCormick) stay.
+const SMALL = new Set(['a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'in', 'n', 'nor', 'of', 'on', 'or', 'the', 'to', 'with', 'from', 'into', 'over',
+  'au', 'aux', 'de', 'del', 'della', 'di', 'du', 'la', 'le', 'al', 'alla', 'con', 'en', 'y']); // coq au vin, pasta alla vodka
+function titleCase(s) {
+  const words = (s || '').trim().split(/\s+/);
+  return words.map((w, i) => {
+    const bare = w.toLowerCase().replace(/[^a-z']/g, '');
+    if (i > 0 && i < words.length - 1 && SMALL.has(bare) && !/[(:–—-]$/.test(words[i - 1])) return w.toLowerCase();
+    return w.replace(/(^|[-/(“"])(\p{Ll})/gu, (m, pre, c) => pre + c.toUpperCase());
+  }).join(' ');
+}
 const lines = text => (text || '').split('\n').map(l => l.trim()).filter(Boolean);
 const toInt = v => (parseInt(v, 10) > 0 ? parseInt(v, 10) : null);
 
@@ -220,6 +232,7 @@ async function readRecipe(a, from, read, origin) {
   try { pv = await read(); } catch (e) { Object.assign(a, { step: from, err: e.message }); return; }
   if (S.add !== a) return; // closed while reading
   pv.origin = origin;
+  pv.title = titleCase(pv.title);
   pv.dupe = pv.source_url ? rows.recipes.find(r => r.source_url && r.source_url === pv.source_url)?.id || null : null;
   Object.assign(a, { step: 'preview', pv, name: undefined, ing: undefined });
   S.aiSpent = null; // refetched next time Settings opens
@@ -234,10 +247,11 @@ async function runFind(a, q) {
   render();
   let res;
   try { res = await data.aiFind(q); } catch (e) { Object.assign(a, { step: 'find', err: e.message }); return; }
+  res.results.forEach(x => { x.title = titleCase(x.title); });
   S.lastFind = { q, found: res.results, foundCost: res.cost_usd, at: Date.now() };
   S.aiSpent = null;
   if (S.add !== a) { S.toast = `Your search for “${q}” is ready. Open Find a recipe to see it.`; return; }
-  Object.assign(a, { step: 'find', found: res.results, foundCost: res.cost_usd });
+  Object.assign(a, { step: 'find', found: res.results, foundCost: res.cost_usd, seen: null });
 }
 function restoreFind(a) {
   const f = S.lastFind;
@@ -263,7 +277,7 @@ async function readMany() {
   const next = async () => {
     for (let x; (x = list.find(y => y.st === 'wait'));) {
       x.st = 'reading'; render();
-      try { x.pv = await data.aiRecipe({ kind: 'photo', images: [{ media_type: x.media_type, data: x.data }] }); x.name = x.pv.title; x.st = 'done'; }
+      try { x.pv = await data.aiRecipe({ kind: 'photo', images: [{ media_type: x.media_type, data: x.data }] }); x.name = x.pv.title = titleCase(x.pv.title); x.st = 'done'; }
       catch (e) { x.err = e.message; x.st = 'fail'; }
       if (S.many !== list) return;
       render();
@@ -360,6 +374,7 @@ const ACTIONS = {
   delrecipe: id => deleteRecipe(id),
   findput: i => saveFound(Number(i), false),
   findpick: i => saveFound(Number(i), true),
+  findsee: i => { S.add.seen = S.add.seen === Number(i) ? null : Number(i); },
   findmore: async v => { const a = S.add; await runFind(a, `${(a.q || '').replace(/, (classic version|Luke-friendly|no dairy|something different)/g, '')}, ${v}`); },
   rmusual: id => {
     const u = rows.usuals.find(x => x.id === id);
@@ -581,7 +596,7 @@ document.addEventListener('pointerup', endSwipe);
 document.addEventListener('pointercancel', endSwipe);
 
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-rmphoto],[data-rmmany],[data-viewphoto],[data-delrecipe],[data-rmusual],[data-rmskip],[data-findput],[data-findpick],[data-findmore],[data-rmsite],[data-units],[data-a]');
+  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-rmphoto],[data-rmmany],[data-viewphoto],[data-delrecipe],[data-rmusual],[data-rmskip],[data-findput],[data-findpick],[data-findsee],[data-findmore],[data-rmsite],[data-units],[data-a]');
   if (!el || el.disabled) return;
   // Tapping outside the sheet closes it, except while it's searching or reading (the × still does).
   if (el.dataset.a === 'closeadd' && el.classList.contains('ov') && (e.target.closest('[data-stop]') || S.add?.step === 'reading' || manyBusy())) return;
