@@ -229,6 +229,43 @@ export function removePhotos(paths) {
   return enqueue(c => c.storage.from(BUCKET).remove(paths).then(check));
 }
 
+// Resolves once every save queued so far has gone through.
+export const settled = () => enqueue(() => Promise.resolve());
+
+// Sharing a recipe by link (supabase/functions/share-recipe). Sample mode keeps shares in this
+// tab's sessionStorage, so a share link opened in the same tab can be tried.
+const SAMPLE_SHARES = 'sample-shares';
+const sampleShares = () => { try { return JSON.parse(sessionStorage.getItem(SAMPLE_SHARES) || '{}'); } catch { return {}; } };
+async function shareCall(body) {
+  const { data, error } = await (await client()).functions.invoke('share-recipe', { body });
+  if (error) {
+    const b = await error.context?.json?.().catch(() => null);
+    throw new Error(b?.error || 'Couldn’t reach the app’s server. Check your connection.');
+  }
+  return data;
+}
+// recipe: { id, title, servings, time_min, steps, source_url, site, origin, photo_paths }, ingredients: [lines]
+export async function shareCreate(recipe, ingredients) {
+  if (mode !== 'sample') return (await shareCall({ action: 'create', recipe_id: recipe.id })).token;
+  const token = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+  const all = sampleShares();
+  all[token] = { recipe: { ...recipe, ingredients, id: undefined, photo_paths: undefined }, photos: recipe.photo_paths.map(p => samplePhotos.get(p)).filter(Boolean), shared_by: 'Sample' };
+  try { sessionStorage.setItem(SAMPLE_SHARES, JSON.stringify(all)); } catch { /* too big for storage: photos dropped */ }
+  return token;
+}
+export async function shareGet(token) {
+  if (mode !== 'sample') return shareCall({ action: 'get', token });
+  const s = sampleShares()[token];
+  if (!s) throw new Error('That shared recipe isn’t available anymore.');
+  return s;
+}
+// After our copy is saved: its photos, copied into our household's folder. Returns the paths.
+export async function sharePhotos(token, recipeId, householdId) {
+  if (mode !== 'sample') return (await shareCall({ action: 'photos', token, recipe_id: recipeId })).photo_paths;
+  const s = sampleShares()[token];
+  return (s?.photos || []).map((url, i) => { const p = `${householdId}/${recipeId}/${i + 1}.jpg`; samplePhotos.set(p, url); return p; });
+}
+
 // crypto.randomUUID only exists on https and localhost; phones testing over Wi-Fi use plain http.
 export function newId() {
   if (crypto.randomUUID) return crypto.randomUUID();

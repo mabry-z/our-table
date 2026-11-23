@@ -55,6 +55,7 @@ function vRecipe(S, M, r) {
     + `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:12px 0">`
     + (isPick ? `<span class="mu" style="align-self:center">${icon('check')} In this week's picks</span>` : `<button class="ib dk" data-a="topicks">${icon('plus')} Add to this week's picks</button>`)
     + `<button class="ib" data-a="editrecipe">${icon('pencil')} Edit</button>`
+    + `<button class="ib" data-a="shareout">${icon('share')} Share</button>`
     + (r.source_url ? `<a class="ib" href="${esc(r.source_url)}" target="_blank" rel="noopener noreferrer" style="text-decoration:none">${icon('external-link')} Original</a>` : '')
     + `</div>`;
   const photos = r.photo_paths || [];

@@ -6,6 +6,7 @@ import { vPlan, vAddSheet, todayNum } from './views/plan.js';
 import { vAskBar, vAskSheet, ASK_CTX, ASK_CAP, askDay } from './views/ask.js';
 import { vRecipes, editFields, cookIngredients, basePortions } from './views/recipes.js';
 import { vCook, vCookAll, stepTimers, stepParts, timerLeft, mmss } from './views/cook.js';
+import { vShareOut, vShareIn } from './views/share.js';
 import { vList } from './views/list.js';
 import { vSettings } from './views/settings.js';
 import { vSignin, vNoHousehold } from './views/signin.js';
@@ -21,6 +22,7 @@ const S = {
   ask: null, askKept: null, askFocus: false, // the Ask sheet (see js/views/ask.js); the last one closed
   pendingDel: null, swiped: null,   // recipe waiting out its Undo; recipe row swiped open
   portions: {}, got: {},            // recipe page: portions chosen and ingredients checked off, by recipe
+  shareOut: null, shareIn: null,     // sharing a recipe by link: the link being made; a shared recipe being opened
   mealMenu: null, moveWarn: null,   // Plan: the dinner whose ⋯ menu is open; a move waiting on the freshness check
   cook: null,                       // cook mode: { id, step, portions, factor, timers, rate, awake, all }
   page: null, newUsual: { label: '', qty: '' }, newSkip: '', newSite: '', setErr: '', // Settings sub-pages
@@ -74,7 +76,7 @@ function render() {
   $('tabs').innerHTML = TABS.map(([k, i, l]) => `<button class="${S.tab === k ? 'a' : ''}" data-tab="${k}"${S.tab === k ? ' aria-current="page"' : ''}>${icon(i)}${l}</button>`).join('');
   $('sheet').innerHTML = S.viewPhoto
     ? `<div class="ov photo-view" data-a="closephoto"><img src="${esc(S.viewPhoto)}" alt="Recipe photo, full size"><button class="ib" data-a="closephoto" aria-label="Close">${icon('x')}</button></div>`
-    : S.ask ? vAskSheet(S, M) : vAddSheet(S, M);
+    : S.shareIn ? vShareIn(S) : S.shareOut ? vShareOut(S, M) : S.ask ? vAskSheet(S, M) : vAddSheet(S, M);
   const ctx = askCtx();
   if (ctx) {
     $('dock').innerHTML = vAskBar(ctx);
@@ -619,7 +621,7 @@ async function checkVersion() {
   try {
     const { v } = await (await fetch('version.json?t=' + Date.now(), { cache: 'no-store' })).json();
     if (!v || v <= mine) return;
-    if (S.cook || S.add || S.edit || S.ask || S.many || S.busy) return; // next time the app comes back
+    if (S.cook || S.add || S.edit || S.ask || S.many || S.busy || S.shareIn || S.shareOut) return; // next time the app comes back
     const url = new URL(location.href);
     if (url.searchParams.get('v') === v) return; // already tried this one; don't loop
     url.searchParams.set('v', v);
@@ -647,6 +649,52 @@ async function start() {
     S.screen = 'error';
   }
   render();
+  if (S.screen === 'app' && pendingShare) { const t = pendingShare; pendingShare = null; openShare(t); }
+}
+
+// ---- Sharing a recipe by link (js/views/share.js, supabase/functions/share-recipe) ----
+// A share link is the app's address with ?share=<token>. Opened before signing in, it waits.
+let pendingShare = new URLSearchParams(location.search).get('share');
+const shareToken = text => { try { const u = new URL(text, location.href); return u.searchParams.get('share'); } catch { return null; } };
+
+async function openShare(token) {
+  S.shareIn = { token, loading: true };
+  const url = new URL(location.href);
+  if (url.searchParams.has('share')) { url.searchParams.delete('share'); history.replaceState(history.state, '', url.href); }
+  render();
+  try {
+    const d = await data.shareGet(token);
+    if (S.shareIn?.token !== token) return;
+    const r = d.recipe, have = rows.recipes.find(x => x.status === 'box'
+      && (r.source_url ? x.source_url === r.source_url : x.title.toLowerCase() === r.title.toLowerCase()));
+    Object.assign(S.shareIn, { loading: false, data: d, have: have?.id || null });
+  } catch (e) {
+    if (S.shareIn?.token === token) Object.assign(S.shareIn, { loading: false, err: e.message });
+  }
+  render();
+}
+
+// Saves our own copy of the shared recipe, then copies its photos into our folder.
+async function saveShared(toPicks) {
+  const s = S.shareIn, r = s.data.recipe;
+  s.saving = true; s.saveErr = ''; render();
+  const recipe = saveRecipe({ title: r.title, origin: r.origin || 'typed', source_url: r.source_url, site: r.site,
+    time_min: r.time_min, servings: r.servings, steps: r.steps || [], ing: r.ingredients });
+  refresh();
+  if (s.data.photos.length) {
+    try {
+      await data.settled();
+      const paths = await data.sharePhotos(s.token, recipe.id, M.hh.id);
+      s.data.photos.forEach((u, i) => { if (paths[i]) S.photoUrls[paths[i]] = { url: u, at: Date.now() }; });
+      persist('recipes', recipe.id, { photo_paths: paths });
+    } catch (e) {
+      console.error(e);
+      S.err = 'The recipe is saved, but its photos didn’t copy. Open the link again later to try once more.';
+    }
+  }
+  S.shareIn = null;
+  if (toPicks) addPick(recipe.id);
+  else { openRecipe(recipe.id); S.toast = `${recipe.title} is in your recipe box.`; }
 }
 
 const ACTIONS = {
@@ -689,6 +737,7 @@ const ACTIONS = {
   mealmenu: id => { S.mealMenu = S.mealMenu === id ? null : id; },
   moveto: v => { const [from, to] = v.split(':'); moveMeal(from, to, false); },
   skipmeal: id => skipMeal(id),
+  shareview: i => { S.viewPhoto = S.shareIn?.data?.photos[Number(i)] || null; },
   cooktonight: id => { openRecipe(id); if ((M.recipeById.get(id)?.steps || []).length) startCook(); },
   // The day we did this week's shopping (List), or tap it again to clear it.
   shopday: iso => { const wk = M.weeks[S.week]; persist('plans', wk.id, { shopped_on: wk.shopped_on === iso ? null : iso }); },
@@ -812,6 +861,32 @@ function ring() {
 }
 
 const A = {
+  // Sharing (see openShare and saveShared)
+  shareout: async () => {
+    const r = M.recipeById.get(S.recipe);
+    S.shareOut = { recipeId: r.id, busy: true };
+    render();
+    try {
+      await data.settled(); // a fresh edit reaches the database before it's copied
+      const token = await data.shareCreate(r, recipeLines(r.id));
+      const url = new URL(location.pathname, location.origin);
+      url.searchParams.set('share', token);
+      if (data.mode === 'sample') url.searchParams.set('sample', '');
+      Object.assign(S.shareOut, { busy: false, url: url.href });
+    } catch (e) { Object.assign(S.shareOut, { busy: false, err: e.message }); }
+  },
+  sharesend: () => {
+    const o = S.shareOut, r = M.recipeById.get(o.recipeId);
+    navigator.share?.({ title: r.title, text: `${r.title}, from our recipe box`, url: o.url }).catch(() => {});
+  },
+  sharecopy: async () => {
+    try { await navigator.clipboard.writeText(S.shareOut.url); S.shareOut.copied = true; }
+    catch { const i = $('shareurl'); i?.select(); S.shareOut.err = ''; S.toast = 'Select the link and copy it.'; }
+  },
+  shareclose: () => { if (!S.shareOut?.busy && !S.shareIn?.saving) { S.shareOut = null; S.shareIn = null; } },
+  shareinsave: () => saveShared(false),
+  shareinpick: () => saveShared(true),
+  shareopenhave: () => { const id = S.shareIn.have; S.shareIn = null; openRecipe(id); },
   mealmenuclose: () => { S.mealMenu = null; },
   movewarnclose: () => { S.moveWarn = null; },
   moveforce: () => moveMeal(S.moveWarn.from, S.moveWarn.to, true),
@@ -834,6 +909,8 @@ const A = {
   linkgo: async () => {
     const a = S.add, url = (a.url || '').trim();
     if (!url) { a.err = 'Paste a recipe link first.'; return; }
+    const share = shareToken(url);
+    if (share) { S.add = null; return openShare(share); } // a recipe shared from another household
     await readRecipe(a, 'link', () => data.importRecipe(url), 'link');
   },
   findgo: async () => {
@@ -998,12 +1075,13 @@ document.addEventListener('pointerup', endSwipe);
 document.addEventListener('pointercancel', endSwipe);
 
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-rmphoto],[data-rmmany],[data-viewphoto],[data-askstarter],[data-askback],[data-asksee],[data-askput],[data-askpick],[data-askbox],[data-askmake],[data-askseen],[data-delrecipe],[data-rmusual],[data-rmskip],[data-findput],[data-findpick],[data-findsee],[data-findmore],[data-rmsite],[data-units],[data-got],[data-cooktimer],[data-cooktreset],[data-cookgo],[data-cookrate],[data-mealmenu],[data-moveto],[data-skipmeal],[data-cooktonight],[data-shopday],[data-a]');
+  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-rmphoto],[data-rmmany],[data-viewphoto],[data-askstarter],[data-askback],[data-asksee],[data-askput],[data-askpick],[data-askbox],[data-askmake],[data-askseen],[data-delrecipe],[data-rmusual],[data-rmskip],[data-findput],[data-findpick],[data-findsee],[data-findmore],[data-rmsite],[data-units],[data-got],[data-cooktimer],[data-cooktreset],[data-cookgo],[data-cookrate],[data-mealmenu],[data-moveto],[data-skipmeal],[data-cooktonight],[data-shopday],[data-shareview],[data-a]');
   if (!el || el.disabled) return;
   // Tapping outside the sheet closes it, except while it's searching or reading (the × still does).
   if (el.dataset.a === 'closeadd' && el.classList.contains('ov') && (e.target.closest('[data-stop]') || S.add?.step === 'reading' || manyBusy())) return;
   if (el.dataset.a === 'askclose' && el.classList.contains('ov') && (e.target.closest('[data-stop]') || S.ask?.loading)) return;
   if (el.dataset.a === 'cookallclose' && el.classList.contains('ov') && e.target.closest('[data-stop]')) return;
+  if (el.dataset.a === 'shareclose' && el.classList.contains('ov') && e.target.closest('[data-stop]')) return;
   if (el.dataset.a === 'askopen' && e.target.closest('label')) return; // the bar's camera: the photo opens the sheet
   if (justSwiped) return;                                          // the end of a swipe isn't a tap
   if (S.swiped && el.dataset.recipe) { S.swiped = null; render(); return; } // a tap closes an open row
