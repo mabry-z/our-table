@@ -1,4 +1,5 @@
 import { esc, icon, lukePill, sourcePill, head, stars } from '../ui.js';
+import { scaleLine, portionsControl } from './cook.js';
 
 const FILTERS = ['All', 'Quick', 'Luke-friendly'];
 
@@ -6,7 +7,15 @@ function ingredientLines(M, r) {
   return M.recipeIngredients.filter(ri => ri.recipe_id === r.id).sort((a, b) => a.position - b.position)
     .map(ri => ri.note || M.ingredientById.get(ri.ingredient_id)?.name || '');
 }
-const stepText = s => (typeof s === 'string' ? s : [s.title, s.text].filter(Boolean).join(': '));
+// Ingredients for cook mode and the recipe page: the line shown (scaled) and the name to match in steps.
+export function cookIngredients(M, r, factor) {
+  return M.recipeIngredients.filter(ri => ri.recipe_id === r.id).sort((a, b) => a.position - b.position).map(ri => {
+    const name = M.ingredientById.get(ri.ingredient_id)?.name || '';
+    return { line: scaleLine(ri.note || name, factor), name: name || ri.note || '' };
+  });
+}
+export const basePortions = (M, r) => Number(r.servings) || Number(M.hh.portions) || 4;
+export const stepText = s => (typeof s === 'string' ? s : [s.title, s.text].filter(Boolean).join(': '));
 
 export function vRecipes(S, M) {
   const r = S.recipe && M.recipeById.get(S.recipe);
@@ -57,11 +66,17 @@ function vRecipe(S, M, r) {
           : `<div class="thumb" style="display:flex;align-items:center;justify-content:center;color:var(--faint)">${icon('photo')}</div>`;
       }).join('') + `</div></div>`;
   }
-  h += `<div class="cd"><div class="ey" style="margin-bottom:6px">Ingredients</div>`
-    + (ings.length ? `<ul class="ul">${ings.map(l => `<li>${esc(l)}</li>`).join('')}</ul>`
-      : `<div class="mu">No ingredients yet. Tap Edit to add them, so this dinner fills the shopping list.</div>`) + `</div>`;
-  h += `<div class="cd"><div class="ey" style="margin-bottom:6px">Steps</div>`
-    + (steps.length ? `<ol class="ul">${steps.map(s => `<li>${esc(stepText(s))}</li>`).join('')}</ol>` : `<div class="mu">No steps saved.</div>`) + `</div>`;
+  if (steps.length) h += `<button class="big dk" data-a="cookstart" style="margin:0 0 16px">${icon('chef-hat')} Start cooking</button>`;
+  const base = basePortions(M, r), portions = S.portions[r.id] || base, got = S.got[r.id] || [];
+  const lines = cookIngredients(M, r, portions / base).map(x => x.line);
+  h += `<div class="row" style="margin:4px 2px 8px"><div class="sf dsp" style="font-size:22px">Ingredients</div>${ings.length ? portionsControl(portions) : ''}</div>`
+    + (ings.length ? `<div class="cd" style="padding:2px 14px">${lines.map((l, j) => {
+      const on = got.includes(j);
+      return `<div class="it${on ? ' on' : ''}" data-got="${j}" role="checkbox" aria-checked="${on}" tabindex="0" style="padding:9px 0;${j ? '' : 'border-top:none'}"><span class="bx${on ? ' on' : ''}">${on ? icon('check') : ''}</span><span class="lb">${esc(l)}</span></div>`;
+    }).join('')}</div><div class="mu" style="margin:-2px 2px 16px">${portions !== base ? `Scaled from ${base} portions. ` : ''}Tap to check off as you gather.</div>`
+      : `<div class="cd"><div class="mu">No ingredients yet. Tap Edit to add them, so this dinner fills the shopping list.</div></div>`);
+  h += `<div class="sf dsp" style="font-size:22px;margin:0 2px 8px">Steps</div><div class="cd">`
+    + (steps.length ? `<ol class="ul">${steps.map(s => `<li>${esc(stepText(s))}</li>`).join('')}</ol>` : `<div class="mu">No steps saved. Tap Edit to add them, one per line, to cook from this recipe.</div>`) + `</div>`;
   const planned = M.weeks.some(w => !w.past && w.meals.some(m => m.recipe_id === r.id));
   h += `<button class="ib" data-delrecipe="${r.id}" style="display:flex;margin:18px auto 4px;border-color:#E7CDBD;color:#A3412E">${icon('trash')} Delete recipe</button>`
     + (planned ? `<div class="mu" style="text-align:center">It's planned for a night; that night will open up again.</div>` : '');

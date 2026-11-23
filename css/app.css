@@ -135,3 +135,20 @@ button.thumb { background: var(--card); }
 
 .rate { display: flex; align-items: center; gap: 4px; font-size: 14px; color: #6E5527; margin-bottom: 2px; }
 .rate .ti { color: #C9A227; font-size: 15px; }
+
+/* Cook mode (phase 5): one step per screen, large type, the nav pinned to the bottom. */
+.bd.cook { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+.cook-prog { display: flex; gap: 4px; margin: 12px 0 20px; }
+.cook-prog > div { flex: 1; height: 4px; border-radius: 2px; background: var(--rule); }
+.cook-prog > div.on { background: var(--sage); }
+.cook-title { font-size: 30px; line-height: 1.2; margin-top: 4px; }
+.cook-text { font-size: 21px; line-height: 1.55; margin: 12px 0 20px; }
+.cook-text.solo { margin-top: 6px; font-size: 23px; }
+.cook-timer { padding: 14px 16px; margin-top: 4px; }
+.cook-timer.up, .cook-others .ib.up { border-color: #C88E6E; background: #F8EDE6; color: #7A4632; }
+.cook-others { display: flex; flex-wrap: wrap; gap: 6px; margin: -8px 0 14px; }
+.cook-nav { display: flex; gap: 8px; margin-top: 12px; position: sticky; bottom: calc(10px + env(safe-area-inset-bottom)); }
+.cook-nav .ib { height: 52px; font-size: 16px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.cook-nav .ib:first-child { flex: 1; background: var(--bg); }
+.cook-nav .ib.dk { flex: 2; }
+.cook-nav .ib:disabled, .ib:disabled { opacity: .4; cursor: default; }

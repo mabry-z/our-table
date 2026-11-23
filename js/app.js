@@ -4,7 +4,8 @@ import { assemble, guessAisle, AISLES, DAYS, DAY_SHORT } from './model.js';
 import { esc, icon, weekOf } from './ui.js';
 import { vPlan, vAddSheet } from './views/plan.js';
 import { vAskBar, vAskSheet, ASK_CTX, ASK_CAP, askDay } from './views/ask.js';
-import { vRecipes, editFields } from './views/recipes.js';
+import { vRecipes, editFields, cookIngredients, basePortions } from './views/recipes.js';
+import { vCook, vCookAll, stepTimers, stepParts, timerLeft, mmss } from './views/cook.js';
 import { vList } from './views/list.js';
 import { vSettings } from './views/settings.js';
 import { vSignin, vNoHousehold } from './views/signin.js';
@@ -19,6 +20,8 @@ const S = {
   photoUrls: {}, viewPhoto: null,   // recipe photo links by storage path; the photo shown full size
   ask: null, askKept: null, askFocus: false, // the Ask sheet (see js/views/ask.js); the last one closed
   pendingDel: null, swiped: null,   // recipe waiting out its Undo; recipe row swiped open
+  portions: {}, got: {},            // recipe page: portions chosen and ingredients checked off, by recipe
+  cook: null,                       // cook mode: { id, step, portions, factor, timers, rate, awake, all }
   page: null, newUsual: { label: '', qty: '' }, newSkip: '', newSite: '', setErr: '', // Settings sub-pages
   toast: '', newItem: '', newAisle: '', listErr: '', moveItem: null,
   email: '', signErr: '', busy: false, err: '', user: null,
@@ -54,6 +57,16 @@ function render() {
   if (S.screen === 'signin') { body.innerHTML = vSignin(S, data.mode); return; }
   if (S.screen === 'nohousehold') { body.innerHTML = vNoHousehold(S.user); return; }
   if (S.screen === 'error') { body.innerHTML = `<div class="cd" style="margin-top:20vh;text-align:center">${esc(S.err)}<div style="margin-top:10px"><button class="ib" data-a="reload">Try again</button></div></div>`; return; }
+  body.classList.toggle('cook', !!S.cook);
+  if (S.cook) { // full screen: no tabs, no Ask bar
+    const r = cookRecipe();
+    if (!r) { endCook(); return render(); }
+    const ings = cookIngredients(M, r, S.cook.factor);
+    body.classList.add('nobar');
+    body.innerHTML = vCook(S, r, ings, cookSteps());
+    if (S.cook.all) $('sheet').innerHTML = vCookAll(S, ings);
+    return;
+  }
 
   const view = { plan: vPlan, recipes: vRecipes, list: vList, settings: (s, m) => vSettings(s, m, data.mode, S.user) }[S.tab];
   body.innerHTML = (S.err ? `<div class="banner row"><span>${esc(S.err)}</span><button class="ib" data-a="dismiss" aria-label="Dismiss" style="border:none">${icon('x')}</button></div>` : '') + view(S, M);
@@ -641,9 +654,99 @@ const ACTIONS = {
     S.toast = `${itemName(it)} is in ${AISLES.find(a => a[0] === key)[1]} now. We'll remember that.`;
   },
   units: v => setHousehold({ units: v }),
+  // Recipe page: check off ingredients as they're gathered.
+  got: v => { const j = Number(v), g = (S.got[S.recipe] ||= []); S.got[S.recipe] = g.includes(j) ? g.filter(x => x !== j) : [...g, j]; },
+  // Cook mode timers ("<step>:<n>"): start, pause, resume; once up, reset.
+  cooktimer: k => {
+    const c = S.cook, t = c.timers[k];
+    unlockSound();
+    if (!t) { const [i, j] = k.split(':').map(Number); const secs = (p => stepTimers(p.text, p.timer_sec))(stepParts(cookSteps()[i]))[j].secs; c.timers[k] = { run: true, end: Date.now() + secs * 1000, left: secs }; }
+    else if (timerLeft(t) <= 0) delete c.timers[k];
+    else if (t.run) { t.left = timerLeft(t); t.run = false; }
+    else { t.run = true; t.end = Date.now() + t.left * 1000; }
+    tickTimers();
+  },
+  cooktreset: k => { delete S.cook.timers[k]; },
+  cookgo: i => { S.cook.step = Number(i); window.scrollTo(0, 0); },
+  cookrate: v => {
+    S.cook.rate = v;
+    persist('recipes', S.cook.id, { rating: v === 'up' ? 5 : 1 }); // shown as stars in the box; Ask sees it when planning
+  },
 };
 
+// ---- Cook mode (js/views/cook.js) ----
+const cookRecipe = () => M.recipeById.get(S.cook.id);
+const cookSteps = () => cookRecipe()?.steps || [];
+let wakeLock = null, tick = null, audio = null;
+
+function startCook() {
+  const r = M.recipeById.get(S.recipe), base = basePortions(M, r), portions = S.portions[r.id] || base;
+  S.cook = { id: r.id, step: 0, portions, factor: portions / base, timers: {}, rate: null, awake: false, all: false };
+  history.pushState({ cook: 1 }, ''); // the phone's back gesture leaves cook mode, not the app
+  keepAwake();
+  window.scrollTo(0, 0);
+}
+function endCook() {
+  S.cook = null;
+  wakeLock?.release().catch(() => {}); wakeLock = null;
+  clearInterval(tick); tick = null;
+  window.scrollTo(0, 0);
+}
+// Keeps the screen on while cooking (Wake Lock API). Phones drop the lock when the app is hidden,
+// so it's asked for again when the app comes back.
+async function keepAwake() {
+  if (!S.cook || !navigator.wakeLock) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    S.cook && (S.cook.awake = true);
+    wakeLock.addEventListener('release', () => { if (S.cook) { S.cook.awake = false; render(); } });
+    render();
+  } catch (e) { console.warn('Wake lock', e); }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.cook) { keepAwake(); tickTimers(); } });
+window.addEventListener('popstate', () => { if (S.cook) { endCook(); render(); } });
+
+// One clock for every running timer; it updates the numbers in place and re-draws when one is up.
+function tickTimers() {
+  if (tick || !S.cook) return;
+  tick = setInterval(() => {
+    const c = S.cook;
+    if (!c) { clearInterval(tick); tick = null; return; }
+    let running = false, rang = false;
+    for (const [k, t] of Object.entries(c.timers)) {
+      if (!t.run) continue;
+      const left = timerLeft(t);
+      if (left <= 0) { t.run = false; t.left = 0; rang = true; } else running = true;
+      document.querySelectorAll(`[data-tleft="${k}"]`).forEach(el => { el.textContent = left <= 0 ? 'Time is up' : mmss(left); });
+    }
+    if (rang) { ring(); render(); }
+    if (!running) { clearInterval(tick); tick = null; }
+  }, 500);
+}
+// A sound needs a tap first on phones, so Start timer unlocks it.
+function unlockSound() {
+  try { audio ||= new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); } catch { /* no sound, still vibrates and shows */ }
+}
+function ring() {
+  navigator.vibrate?.([300, 150, 300, 150, 300]);
+  if (!audio) return;
+  [0, .45, .9].forEach(at => {
+    const o = audio.createOscillator(), g = audio.createGain(), t0 = audio.currentTime + at;
+    o.frequency.value = 880; o.connect(g); g.connect(audio.destination);
+    g.gain.setValueAtTime(.0001, t0); g.gain.exponentialRampToValueAtTime(.3, t0 + .02); g.gain.exponentialRampToValueAtTime(.0001, t0 + .35);
+    o.start(t0); o.stop(t0 + .4);
+  });
+}
+
 const A = {
+  cookstart: () => startCook(),
+  cookexit: () => { const back = history.state?.cook; endCook(); if (back) history.back(); },
+  cookprev: () => { S.cook.step = Math.max(0, S.cook.step - 1); window.scrollTo(0, 0); },
+  cooknext: () => { S.cook.step = Math.min(cookSteps().length, S.cook.step + 1); window.scrollTo(0, 0); },
+  cookall: () => { S.cook.all = true; },
+  cookallclose: () => { S.cook.all = false; },
+  portm: () => { const r = M.recipeById.get(S.recipe); S.portions[r.id] = Math.max(1, (S.portions[r.id] || basePortions(M, r)) - 1); },
+  portp: () => { const r = M.recipeById.get(S.recipe); S.portions[r.id] = Math.min(48, (S.portions[r.id] || basePortions(M, r)) + 1); },
   tolist: () => { S.tab = 'list'; window.scrollTo(0, 0); },
   startweek: () => { startWeek(S.week); S.toast = 'Week started. Add a dinner to each open night.'; },
   leftovers: () => setMeal(S.add.mealId, { recipe_id: null, leftovers: true }, day => `${day} is a leftovers night.`),
@@ -819,11 +922,12 @@ document.addEventListener('pointerup', endSwipe);
 document.addEventListener('pointercancel', endSwipe);
 
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-rmphoto],[data-rmmany],[data-viewphoto],[data-askstarter],[data-askback],[data-asksee],[data-askput],[data-askpick],[data-askbox],[data-askmake],[data-askseen],[data-delrecipe],[data-rmusual],[data-rmskip],[data-findput],[data-findpick],[data-findsee],[data-findmore],[data-rmsite],[data-units],[data-a]');
+  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-rmphoto],[data-rmmany],[data-viewphoto],[data-askstarter],[data-askback],[data-asksee],[data-askput],[data-askpick],[data-askbox],[data-askmake],[data-askseen],[data-delrecipe],[data-rmusual],[data-rmskip],[data-findput],[data-findpick],[data-findsee],[data-findmore],[data-rmsite],[data-units],[data-got],[data-cooktimer],[data-cooktreset],[data-cookgo],[data-cookrate],[data-a]');
   if (!el || el.disabled) return;
   // Tapping outside the sheet closes it, except while it's searching or reading (the × still does).
   if (el.dataset.a === 'closeadd' && el.classList.contains('ov') && (e.target.closest('[data-stop]') || S.add?.step === 'reading' || manyBusy())) return;
   if (el.dataset.a === 'askclose' && el.classList.contains('ov') && (e.target.closest('[data-stop]') || S.ask?.loading)) return;
+  if (el.dataset.a === 'cookallclose' && el.classList.contains('ov') && e.target.closest('[data-stop]')) return;
   if (el.dataset.a === 'askopen' && e.target.closest('label')) return; // the bar's camera: the photo opens the sheet
   if (justSwiped) return;                                          // the end of a swipe isn't a tap
   if (S.swiped && el.dataset.recipe) { S.swiped = null; render(); return; } // a tap closes an open row
@@ -839,7 +943,7 @@ document.addEventListener('click', async e => {
 
 // Keyboard: list items are role="checkbox"; Enter adds a list item or reads a link.
 document.addEventListener('keydown', async e => {
-  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[data-done]')) { e.preventDefault(); e.target.click(); }
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[data-done],[data-got]')) { e.preventDefault(); e.target.click(); }
   if (e.key === 'Enter' && e.target.id === 'newitem') { e.preventDefault(); A.additem(); render(); $('newitem')?.focus(); }
   if (e.key === 'Enter' && e.target.id === 'linkin') { e.preventDefault(); await A.linkgo(); render(); }
   if (e.key === 'Enter' && e.target.id === 'findin') { e.preventDefault(); await A.findgo(); render(); }

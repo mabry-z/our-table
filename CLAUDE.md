@@ -143,7 +143,7 @@ before/after is in `mockups/readability.html`. Older mockups still show the earl
    Find a recipe (in Add dinner and on Recipes, with "Add to <day>" and See recipe), screenshot
    and photo import with flags, Choose several, kept recipe photos, AI settings.
 4. The Ask bar: results sheet with trail and undo, reusing Find; plan, create, fridge photo, tweak.
-5. Cook mode and learning: cook mode, ratings shaping suggestions, move / skip / freshness, pantry.
+5. Cook mode and learning: cook mode built Nov 23, 2026 (`js/views/cook.js`; timers read from step text, ingredients matched to steps by name, "Make again" / "Not for us" saved as rating 5 / 1). Still to do: ratings shaping suggestions, move / skip / freshness, pantry.
 
 Parked: Globus flyer reader, commissary flyer upload, price engine, budget and stores. See the end of
 `docs/build-plan.md` and `docs/commissary-data.md`.
