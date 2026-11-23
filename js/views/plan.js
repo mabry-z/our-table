@@ -1,4 +1,4 @@
-import { DAYS } from '../model.js';
+import { DAYS, DAY_SHORT, cookByDay, isoDate, addDays } from '../model.js';
 import { esc, icon, lukePill, sourcePill, weekHead } from '../ui.js';
 
 // A site's own rating, e.g. "★ 4.8 · 1,200 ratings".
@@ -10,22 +10,71 @@ export function stars(r) {
 function addBtn(m) { return `<button class="ib" data-add="${m.id}">${icon('plus')} Add dinner</button>`; }
 export const originIcon = r => (r.origin === 'photo' ? 'photo' : r.origin === 'link' || r.origin === 'ai_found' ? 'link' : r.origin === 'typed' ? 'pencil' : 'book');
 
-function mealCard(m, ro) {
-  const day = DAYS[m.day - 1];
+// Which night of this week is today: 1–7; 0 before the week starts; 8 once it's over.
+export function todayNum(wk) {
+  const n = Math.floor((new Date(isoDate() + 'T12:00:00') - new Date(wk.week_start + 'T12:00:00')) / 864e5) + 1;
+  return Math.max(0, Math.min(8, n));
+}
+// "Tue" for a day number of this week, even outside 1–7 (shopped the Saturday before = -1).
+export const dayShort = (wk, n) => new Date(addDays(wk.week_start, n - 1) + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' });
+const dayLong = (wk, n) => new Date(addDays(wk.week_start, n - 1) + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' });
+
+const menuItem = (data, ic, label, sub) => `<button class="mi" ${data}>${icon(ic)}<span style="flex:1">${label}${sub ? `<br><span class="mu">${sub}</span>` : ''}</span></button>`;
+
+function mealCard(S, M, wk, m, ro) {
+  const day = DAYS[m.day - 1], now = todayNum(wk);
+  const gone = ro || m.day < now, tonight = m.day === now;
   if (m.leftovers || !m.recipe) {
-    return `<div class="cd ghost row"><div><div class="ey">${day}</div><div class="sf" style="font-size:17px;color:var(--faint)">${m.leftovers ? 'Leftovers night' : 'Open'}</div></div>`
-      + (ro ? '' : addBtn(m)) + `</div>`;
+    return `<div class="cd ghost row"${gone ? ' style="opacity:.6"' : ''}><div><div class="ey">${day}${tonight ? ' · tonight' : ''}</div><div class="sf" style="font-size:17px;color:var(--faint)">${m.leftovers ? 'Leftovers night' : 'Open'}</div></div>`
+      + (gone ? '' : addBtn(m)) + `</div>`;
   }
-  const r = m.recipe, L = m.locked;
-  const pills = [sourcePill(r), r.time_min ? `<span class="pl" style="background:#E8EEE0;color:#4F5E3E">${icon('clock')} ${r.time_min} min</span>` : '', r.luke_note ? lukePill(r.luke_note) : ''].join('');
-  return `<div class="cd"${L ? ' style="border-color:#B9A88F"' : ''}>`
-    + `<div class="ey">${day}${L ? ' · locked' : ''}</div>`
+  const r = m.recipe, L = m.locked, cb = cookByDay(M, wk, r.id);
+  const fresh = cb && !gone ? (m.day <= cb.day
+    ? `<span class="pl" style="background:#F8EDE6;color:#7A4632">${icon('leaf')} Cook by ${dayShort(wk, cb.day)}</span>`
+    : `<span class="pl" style="background:#F8EDE6;color:#7A4632">${icon('alert-triangle')} ${esc(cb.name)} best by ${dayShort(wk, cb.day)}</span>`) : '';
+  const pills = [sourcePill(r), r.time_min ? `<span class="pl" style="background:#E8EEE0;color:#4F5E3E">${icon('clock')} ${r.time_min} min</span>` : '', fresh, r.luke_note ? lukePill(r.luke_note) : ''].join('');
+  let h = `<div class="cd"${L || tonight ? ' style="border-color:#B9A88F"' : gone ? ' style="opacity:.6"' : ''}>`
+    + `<div class="row"><div class="ey">${day}${tonight ? ' · tonight' : ''}${L ? ' · locked' : ''}</div>`
+    + (gone ? '' : `<button class="ib" data-mealmenu="${m.id}" aria-label="Options for ${day}" aria-expanded="${S.mealMenu === m.id}" style="border:none;padding:0 4px;margin:-4px -4px -4px 0">${icon('dots')}</button>`) + `</div>`
     + `<button class="rrow" data-openrecipe="${r.id}" style="padding:2px 0 0"><span class="sf" style="flex:1;font-size:18px;line-height:1.25">${esc(r.title)}</span>${icon('chevron-right')}</button>`
-    + (pills ? `<div class="pills">${pills}</div>` : '')
-    + (ro ? '' : `<div class="acts"><button class="ib ${L ? 'dk' : ''}" data-lock="${m.id}">${icon(L ? 'lock' : 'lock-open')} ${L ? 'Locked' : 'Lock'}</button>`
-      + (L || m.options.length < 2 ? '' : `<button class="ib" data-swap="${m.id}">${icon('arrows-exchange')} Swap</button>`)
-      + (L ? '' : `<button class="ib" data-clear="${m.id}" aria-label="Clear ${day}">${icon('x')} Clear</button>`) + `</div>`)
-    + `</div>`;
+    + (pills ? `<div class="pills">${pills}</div>` : '');
+  if (S.mealMenu === m.id) {
+    const targets = wk.meals.filter(x => x.id !== m.id && x.day >= Math.max(1, now));
+    const what = x => (x.locked ? ' · locked' : x.leftovers ? ' · leftovers' : !x.recipe ? ' · open' : '');
+    h += `<div style="margin-top:10px">`
+      + (targets.length ? `<div class="ey" style="padding:2px 2px 6px">Move to</div><div class="pills" style="margin:0 0 8px">`
+        + targets.map(x => `<button class="ib" data-moveto="${m.id}:${x.id}"${x.locked ? ' disabled' : ''}>${DAY_SHORT[x.day - 1]}${what(x)}</button>`).join('') + `</div>`
+        + `<div class="mu" style="margin:-2px 2px 8px">A night with a dinner trades places with this one.</div>` : '')
+      + menuItem(`data-skipmeal="${m.id}"`, 'player-skip-forward', tonight ? 'Skip tonight' : `Skip ${day}`,
+        wk.shopped_on ? "Goes to this week's picks · its ingredients count as on hand" : "Goes to this week's picks for another night")
+      + menuItem(`data-add="${m.id}"`, 'arrows-exchange', 'Replace with another dinner', 'From picks, the recipe box, or find one')
+      + (m.options.length > 1 && !L ? menuItem(`data-swap="${m.id}"`, 'refresh', 'Swap for the next suggestion', '') : '')
+      + menuItem(`data-lock="${m.id}"`, L ? 'lock-open' : 'lock', L ? 'Unlock' : 'Lock', L ? '' : 'Plan next week and Ask leave it alone')
+      + menuItem(`data-clear="${m.id}"`, 'x', `Clear ${day}`, 'Opens the night; its ingredients come off the list')
+      + menuItem('data-a="mealmenuclose"', 'chevron-up', 'Close', '')
+      + `</div>`;
+  }
+  const w = S.moveWarn;
+  if (w && w.from === m.id) {
+    const to = wk.meals.find(x => x.id === w.to);
+    h += `<div class="banner" style="margin:10px 0 0;padding:12px"><div class="row" style="justify-content:flex-start;gap:8px;font-weight:700">${icon('leaf')} Freshness check</div>`
+      + w.msgs.map(x => `<div style="margin-top:6px">${esc(x)}</div>`).join('')
+      + `<div style="margin-top:6px">Moving to ${DAYS[to.day - 1]} may mean using it a day or two late, or freezing it now and thawing it the night before.</div>`
+      + `<div style="display:flex;gap:8px;margin-top:10px"><button class="ib" data-a="movewarnclose" style="flex:1;padding:8px;background:var(--card)">Keep it</button>`
+      + `<button class="ib dk" data-a="moveforce" style="flex:1;padding:8px">Move anyway</button></div></div>`;
+  }
+  return h + `</div>`;
+}
+
+// The night's dinner, with a way straight into cook mode.
+function tonightBanner(wk) {
+  const m = wk.meals.find(x => x.day === todayNum(wk));
+  if (!m) return '';
+  if (!m.recipe) return m.leftovers ? `<div class="cd" style="text-align:center"><div class="ey">Tonight</div><div class="sf" style="font-size:19px;color:var(--faint)">Leftovers night</div></div>` : '';
+  const steps = (m.recipe.steps || []).length;
+  return `<div class="cd row" style="background:var(--ink);border-color:var(--ink);color:var(--bg)"><div style="min-width:0"><div class="ey" style="color:#D9CFC0">Tonight</div>`
+    + `<div class="sf" style="font-size:19px;line-height:1.25;margin-top:2px">${esc(m.recipe.title)}</div></div>`
+    + `<button class="ib" data-cooktonight="${m.recipe.id}" style="border-color:var(--bg);color:var(--bg);flex:none;padding:7px 13px">${icon(steps ? 'chef-hat' : 'chevron-right')} ${steps ? 'Cook' : 'Recipe'}</button></div>`;
 }
 
 // This week's picks: recipes either of us drops in, waiting for a night.
@@ -57,9 +106,10 @@ export function vPlan(S, M) {
       + `<button class="ib dk" data-a="startweek" style="padding:8px 16px">${icon('calendar-plus')} Start this week</button></div>`;
   }
   const ro = wk.past;
-  const open = wk.meals.filter(m => !m.leftovers && !m.recipe).length;
+  if (wk.current) h += tonightBanner(wk);
+  const open = wk.meals.filter(m => !m.leftovers && !m.recipe && m.day >= todayNum(wk)).length;
   h += `<div class="row sec"><div class="sf dsp">Dinners</div>${open && !ro ? `<span class="mu">${open} open</span>` : ''}</div>`;
-  h += wk.meals.map(m => mealCard(m, ro)).join('');
+  h += wk.meals.map(m => mealCard(S, M, wk, m, ro)).join('');
   h += `<div class="row sec"><div class="sf dsp">Luke's usuals</div><div class="mu">On every list</div></div><div class="cd">`
     + M.usuals.map((u, j) => `<div class="row" style="padding:6px 0;${j ? 'border-top:1px solid var(--rule2)' : ''}"><div>${esc(u.label)}</div><span class="mu">${esc(u.quantity_label || '')}</span></div>`).join('')
     + `</div>`;

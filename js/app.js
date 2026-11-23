@@ -1,8 +1,8 @@
 // App state, rendering and every tap. Screens are plain functions that return markup.
 import * as data from './data.js';
-import { assemble, guessAisle, AISLES, DAYS, DAY_SHORT } from './model.js';
+import { assemble, guessAisle, AISLES, DAYS, DAY_SHORT, cookByDay, perishable, addDays } from './model.js';
 import { esc, icon, weekOf } from './ui.js';
-import { vPlan, vAddSheet } from './views/plan.js';
+import { vPlan, vAddSheet, todayNum } from './views/plan.js';
 import { vAskBar, vAskSheet, ASK_CTX, ASK_CAP, askDay } from './views/ask.js';
 import { vRecipes, editFields, cookIngredients, basePortions } from './views/recipes.js';
 import { vCook, vCookAll, stepTimers, stepParts, timerLeft, mmss } from './views/cook.js';
@@ -21,6 +21,7 @@ const S = {
   ask: null, askKept: null, askFocus: false, // the Ask sheet (see js/views/ask.js); the last one closed
   pendingDel: null, swiped: null,   // recipe waiting out its Undo; recipe row swiped open
   portions: {}, got: {},            // recipe page: portions chosen and ingredients checked off, by recipe
+  mealMenu: null, moveWarn: null,   // Plan: the dinner whose ⋯ menu is open; a move waiting on the freshness check
   cook: null,                       // cook mode: { id, step, portions, factor, timers, rate, awake, all }
   page: null, newUsual: { label: '', qty: '' }, newSkip: '', newSite: '', setErr: '', // Settings sub-pages
   toast: '', newItem: '', newAisle: '', listErr: '', moveItem: null,
@@ -151,9 +152,12 @@ function syncList(planId) {
   }
   let pos = Math.max(-1, ...rows.list_items.filter(i => i.plan_id === planId).map(i => i.position)) + 1;
   for (const w of want.values()) {
+    // Bought for a dinner we skipped (see skipMeal): it's at home, so it's "have it" here, once.
+    const carried = w.for_label !== 'Luke' && rows.pantry.find(p => p.source === 'typed' && p.ingredient_id === w.ingredient_id);
+    if (carried) { del('pantry', carried.id); rows.pantry = rows.pantry.filter(p => p !== carried); }
     add('list_items', {
       plan_id: planId, ingredient_id: w.ingredient_id, label: w.label, for_label: forLabel(w),
-      quantity_label: w.quantity_label || null, quantity: 1, checked: false, position: pos++, have_it: false, custom: false,
+      quantity_label: w.quantity_label || null, quantity: 1, checked: false, position: pos++, have_it: !!carried, custom: false,
     });
   }
 }
@@ -166,6 +170,50 @@ function setMeal(mealId, patch, toast) {
   S.toast = toast(DAYS[meal.day - 1]);
   S.add = null;
 }
+// Moves a dinner to another night. A night with a dinner trades places with it. Warns first when
+// either dinner's raw meat or fish would be cooked after its cook-by day (unless forced).
+function moveMeal(fromId, toId, force) {
+  const a = rows.plan_meals.find(m => m.id === fromId), b = rows.plan_meals.find(m => m.id === toId);
+  const wk = M.weeks.find(w => w.id === a.plan_id), title = id => M.recipeById.get(id)?.title || 'dinner';
+  if (!force) {
+    const late = (recipeId, day) => {
+      const cb = cookByDay(M, wk, recipeId);
+      return cb && day > cb.day ? `${cb.name} for ${title(recipeId).toLowerCase()} is best cooked by ${dayName(wk, cb.day)}.` : null;
+    };
+    const msgs = [late(a.recipe_id, b.day), b.recipe_id && !b.leftovers ? late(b.recipe_id, a.day) : null].filter(Boolean);
+    if (msgs.length) { S.moveWarn = { from: fromId, to: toId, msgs }; return; }
+  }
+  const keys = ['recipe_id', 'leftovers', 'locked', 'options'];
+  const A0 = Object.fromEntries(keys.map(k => [k, a[k]])), B0 = Object.fromEntries(keys.map(k => [k, b[k]]));
+  bg(data.save('plan_meals', a.id, B0));
+  bg(data.save('plan_meals', b.id, A0));
+  syncList(a.plan_id);
+  refresh();
+  S.moveWarn = null;
+  S.toast = `${title(A0.recipe_id)} is on ${DAYS[b.day - 1]} now.`
+    + (B0.recipe_id ? ` ${title(B0.recipe_id)} moved to ${DAYS[a.day - 1]}.` : B0.leftovers ? ` ${DAYS[a.day - 1]} is leftovers night.` : '');
+}
+const dayName = (wk, n) => new Date(addDays(wk.week_start, n - 1) + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' });
+
+// Skips a dinner: the night opens and the recipe waits in This week's picks. If we've shopped,
+// its ingredients are at home, so they count as "have it" when it gets a night (see syncList).
+function skipMeal(id) {
+  const m = rows.plan_meals.find(x => x.id === id), wk = M.weeks.find(w => w.id === m.plan_id);
+  const r = M.recipeById.get(m.recipe_id), p = wk.shopped_on && perishable(M, r.id), cb = cookByDay(M, wk, r.id);
+  if (!rows.picks.some(x => x.recipe_id === r.id)) add('picks', { recipe_id: r.id, added_by: S.user?.id ?? null, added_at: new Date().toISOString() });
+  if (wk.shopped_on) {
+    rows.recipe_ingredients.filter(ri => ri.recipe_id === r.id).forEach(ri => {
+      if (rows.pantry.some(x => x.source === 'typed' && x.ingredient_id === ri.ingredient_id)) return;
+      add('pantry', { ingredient_id: ri.ingredient_id, label: rows.ingredients.find(i => i.id === ri.ingredient_id)?.name || ri.note || 'Ingredient', source: 'typed', updated_at: new Date().toISOString() });
+    });
+  }
+  setMeal(id, { recipe_id: null, leftovers: false }, () => '');
+  S.toast = `Skipped ${r.title}. It's in this week's picks for another night`
+    + (wk.shopped_on ? '; its ingredients won’t go on the list again.' : '.')
+    + (!p ? '' : cb.day <= todayNum(wk) ? ` The ${p.name.toLowerCase()} is best cooked by ${cb.day < todayNum(wk) ? dayName(wk, cb.day) : 'today'}, so freeze it tonight.`
+      : ` Freeze the ${p.name.toLowerCase()} if it won’t be cooked by ${dayName(wk, cb.day)}.`);
+}
+
 function placeRecipe(recipeId) {
   const r = rows.recipes.find(x => x.id === recipeId);
   setMeal(S.add.mealId, { recipe_id: recipeId, leftovers: false }, day => `${r.title} is on ${day}. Its ingredients are on the list.`);
@@ -637,6 +685,13 @@ const ACTIONS = {
     refresh();
   },
   clear: id => setMeal(id, { recipe_id: null, leftovers: false }, day => `${day} is open again.`),
+  // A dinner's ⋯ menu on Plan
+  mealmenu: id => { S.mealMenu = S.mealMenu === id ? null : id; },
+  moveto: v => { const [from, to] = v.split(':'); moveMeal(from, to, false); },
+  skipmeal: id => skipMeal(id),
+  cooktonight: id => { openRecipe(id); if ((M.recipeById.get(id)?.steps || []).length) startCook(); },
+  // The day we did this week's shopping (List), or tap it again to clear it.
+  shopday: iso => { const wk = M.weeks[S.week]; persist('plans', wk.id, { shopped_on: wk.shopped_on === iso ? null : iso }); },
   add: id => { S.add = { target: 'meal', mealId: id, step: 'menu' }; },
   addstep: v => {
     Object.assign(S.add, { step: v, err: '' });
@@ -757,6 +812,9 @@ function ring() {
 }
 
 const A = {
+  mealmenuclose: () => { S.mealMenu = null; },
+  movewarnclose: () => { S.moveWarn = null; },
+  moveforce: () => moveMeal(S.moveWarn.from, S.moveWarn.to, true),
   cookstart: () => startCook(),
   cookexit: () => { const back = history.state?.cook; endCook(); if (back) history.back(); },
   cookprev: () => { S.cook.step = Math.max(0, S.cook.step - 1); window.scrollTo(0, 0); },
@@ -940,7 +998,7 @@ document.addEventListener('pointerup', endSwipe);
 document.addEventListener('pointercancel', endSwipe);
 
 document.addEventListener('click', async e => {
-  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-rmphoto],[data-rmmany],[data-viewphoto],[data-askstarter],[data-askback],[data-asksee],[data-askput],[data-askpick],[data-askbox],[data-askmake],[data-askseen],[data-delrecipe],[data-rmusual],[data-rmskip],[data-findput],[data-findpick],[data-findsee],[data-findmore],[data-rmsite],[data-units],[data-got],[data-cooktimer],[data-cooktreset],[data-cookgo],[data-cookrate],[data-a]');
+  const el = e.target.closest('[data-tab],[data-week],[data-lock],[data-swap],[data-clear],[data-add],[data-addstep],[data-boxpick],[data-frompick],[data-filt],[data-recipe],[data-openrecipe],[data-pickopen],[data-pickto],[data-unpick],[data-done],[data-haveit],[data-rmitem],[data-moveitem],[data-rmphoto],[data-rmmany],[data-viewphoto],[data-askstarter],[data-askback],[data-asksee],[data-askput],[data-askpick],[data-askbox],[data-askmake],[data-askseen],[data-delrecipe],[data-rmusual],[data-rmskip],[data-findput],[data-findpick],[data-findsee],[data-findmore],[data-rmsite],[data-units],[data-got],[data-cooktimer],[data-cooktreset],[data-cookgo],[data-cookrate],[data-mealmenu],[data-moveto],[data-skipmeal],[data-cooktonight],[data-shopday],[data-a]');
   if (!el || el.disabled) return;
   // Tapping outside the sheet closes it, except while it's searching or reading (the × still does).
   if (el.dataset.a === 'closeadd' && el.classList.contains('ov') && (e.target.closest('[data-stop]') || S.add?.step === 'reading' || manyBusy())) return;
@@ -950,6 +1008,8 @@ document.addEventListener('click', async e => {
   if (justSwiped) return;                                          // the end of a swipe isn't a tap
   if (S.swiped && el.dataset.recipe) { S.swiped = null; render(); return; } // a tap closes an open row
   S.toast = '';
+  if (!('mealmenu' in el.dataset)) S.mealMenu = null; // any other tap closes a dinner's menu
+  if (!['moveforce', 'movewarnclose'].includes(el.dataset.a)) S.moveWarn = null;
   const key = Object.keys(el.dataset).find(k => k in ACTIONS);
   if (key) await ACTIONS[key](el.dataset[key]);
   else if (A[el.dataset.a]) await A[el.dataset.a]();

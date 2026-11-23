@@ -44,6 +44,42 @@ export function guessAisle(name) {
   return (AISLE_GUESS.find(([, re]) => re.test(name)) || ['other'])[0];
 }
 
+// ---- Freshness: how many days raw meat and fish keep in the fridge after shopping ----------
+// From USDA fridge guidance: poultry, ground meat, fresh sausage and seafood 1–2 days; steaks,
+// chops and roasts 3–5. Frozen, canned, cured, smoked and cooked things don't count.
+const NOT_FRESH = /(frozen|nugget|canned|\bcans?\b|broth|stock|bouillon|powder|seasoning|smoked|cured|bacon|\bham\b|deli|salami|pepperoni|prosciutto|rotisserie|cooked|jerky|kielbasa|hot dog|fried shrimp|fish sauce|oyster sauce|anchov)/i;
+const KEEPS = [
+  [2, /(salmon|\bcod\b|fish|tuna|tilapia|halibut|trout|shrimp|prawn|scallop|crab|mussel|clam|lobster|seafood)/i],
+  [2, /(chicken|turkey|duck|ground|mince|sausage|bratwurst|chorizo|meatball)/i],
+  [4, /(beef|pork|steak|chop|schnitzel|lamb|veal|roast|tenderloin|brisket|\bribs?\b)/i],
+];
+const NO_FRESH_AISLES = new Set(['frozen', 'canned', 'spices', 'condiments', 'deli', 'snacks', 'pasta', 'baking', 'breakfast', 'drinks']);
+export function keepDays(name, aisle) {
+  if (!name || NO_FRESH_AISLES.has(aisle) || NOT_FRESH.test(name)) return null;
+  return (KEEPS.find(([, re]) => re.test(name)) || [null])[0];
+}
+
+// The ingredient in a recipe that goes off first: { name, days }, or null if nothing perishable.
+export function perishable(M, recipeId) {
+  let best = null;
+  for (const ri of M.recipeIngredients.filter(x => x.recipe_id === recipeId)) {
+    const ing = M.ingredientById.get(ri.ingredient_id), name = ing?.name || ri.note || '';
+    const days = keepDays(name, ing?.aisle);
+    if (days && (!best || days < best.days)) best = { name, days };
+  }
+  return best;
+}
+
+// Day number (1 = Monday of that week) a dinner's perishables should be cooked by, from the day
+// we shopped. Can be below 1 (shopped early) or past 7. Null when not shopped or nothing perishable.
+export function cookByDay(M, wk, recipeId) {
+  if (!wk?.shopped_on || !recipeId) return null;
+  const p = perishable(M, recipeId);
+  if (!p) return null;
+  const shopDay = Math.round((new Date(wk.shopped_on + 'T12:00:00') - new Date(wk.week_start + 'T12:00:00')) / 864e5) + 1;
+  return { day: shopDay + p.days, name: p.name };
+}
+
 export function isoDate(d = new Date()) {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
@@ -68,6 +104,7 @@ export function assemble(rows, today = isoDate()) {
   const week = p => ({
     id: p.id,
     week_start: p.week_start,
+    shopped_on: p.shopped_on || null,
     past: addDays(p.week_start, 7) <= today,
     current: p.week_start <= today && today < addDays(p.week_start, 7),
     meals: rows.plan_meals.filter(m => m.plan_id === p.id).sort((a, b) => a.day - b.day)

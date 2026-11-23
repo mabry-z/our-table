@@ -26,7 +26,8 @@ export function head(eyebrow, title) {
 // Header with arrows to move between planned weeks.
 export function weekHead(S, M, title) {
   const wk = M.weeks[S.week];
-  const label = wk ? weekOf(wk.week_start) + (wk.past ? ' · done' : '') : 'No week planned';
+  const shopped = wk?.shopped_on ? ' · shopped ' + new Date(wk.shopped_on + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' }) : '';
+  const label = wk ? weekOf(wk.week_start) + (wk.past ? ' · done' : shopped) : 'No week planned';
   return `<div class="hd"><div class="wk">`
     + `<button class="nb" data-week="-1" aria-label="Previous week"${S.week <= 0 ? ' disabled' : ''}>${icon('chevron-left')}</button>`
     + `<div class="ey">${label}</div>`
