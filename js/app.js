@@ -563,7 +563,25 @@ function finishDelete() {
   refresh();
 }
 
+// A newer version out (tools/release.ps1 stamps it)? Reload into it, at an address the phone hasn't
+// cached, but never while something is under way: cooking, a sheet open, an edit, a search.
+async function checkVersion() {
+  const mine = window.APP_VERSION;
+  if (!mine || location.hostname === 'localhost') return;
+  try {
+    const { v } = await (await fetch('version.json?t=' + Date.now(), { cache: 'no-store' })).json();
+    if (!v || v <= mine) return;
+    if (S.cook || S.add || S.edit || S.ask || S.many || S.busy) return; // next time the app comes back
+    const url = new URL(location.href);
+    if (url.searchParams.get('v') === v) return; // already tried this one; don't loop
+    url.searchParams.set('v', v);
+    location.replace(url.href);
+  } catch { /* offline or no version file: carry on with this one */ }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkVersion(); });
+
 async function start() {
+  checkVersion();
   S.screen = 'loading'; render();
   try {
     if (data.mode === 'supabase') {

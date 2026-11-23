@@ -16,6 +16,11 @@ show prices, budget and store tags: keep their layout, drop those parts.
   for a yes.
 - **Preview before committing.** When a screen changes, give me a way to see it (local dev server
   URL, or a screenshot) before anything is committed.
+- **Stamp a version before every push:** `powershell -ExecutionPolicy Bypass -File tools/release.ps1`,
+  then commit `index.html` and `version.json` with the change. It gives every file a `?v=` address
+  (import map in `index.html`) so phones get the whole update at once, and open apps reload into it
+  the next time they come to the front (`checkVersion` in `js/app.js`; never mid-cook or mid-edit).
+  A new file in `js/` is picked up automatically when the script runs.
 - Work one build phase at a time. At the end of a phase, summarize what's done, what's left, and how
   to test it on a phone.
 - Keep secrets out of the front end. The Claude API key lives only in Supabase edge functions. Use a
