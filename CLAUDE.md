@@ -32,7 +32,7 @@ show prices, budget and store tags: keep their layout, drop those parts.
 | --- | --- |
 | Platform | Phone web app (like our budget app "Cadence", hosted on GitHub Pages) |
 | Backend | Supabase: Postgres, auth, edge functions |
-| Users | One household, two adults signed in (me and my wife Lydia) sharing one plan, picks and list |
+| Users | One household, two adults signed in (me and my wife Lydia) sharing one plan, picks and list. Since Nov 23, 2026 my mom has her own separate household ("Mom's household", 2 portions, AI suggestions off, $5 limit) because the Ask bar's prompt still describes our family; an "About us" setting per household would fix that |
 | Portions | 4 per dinner by default (two adults plus leftovers) |
 | Dinners per week | 5 cooked + 2 leftovers nights (default) |
 | Budget and prices | None. Dropped Nov 21, 2026. Price and flyer work is parked (see build plan) |

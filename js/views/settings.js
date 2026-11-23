@@ -37,7 +37,7 @@ export function vSettings(S, M, mode, user) {
   h += `<div class="cd" style="padding:4px 14px"><div class="ey" style="padding:10px 0 4px">Family</div>`
     + link('openusuals', "Luke's usuals", `${M.usuals.length} ${M.usuals.length === 1 ? 'item' : 'items'}`)
     + link('openskip', 'Foods we skip', (hh.foods_we_skip || []).join(', ') || 'None')
-    + row('Sharing', `<span class="mu">${mode === 'sample' ? 'Sample data' : people.length >= 2 ? esc(people.join(' and ')) : 'Waiting for Lydia'}</span>`) + `</div>`;
+    + row('Sharing', `<span class="mu">${mode === 'sample' ? 'Sample data' : people.length ? esc(people.join(' and ')) : 'Just you'}</span>`) + `</div>`;
   h += `<div class="row" style="padding:6px 4px"><span class="mu">${mode === 'sample' ? 'Sample data · no database connected' : 'Signed in as ' + esc(user?.email)}</span>`
     + `<button class="ib" data-a="signout">${mode === 'sample' ? 'Sign-in screen' : 'Sign out'}</button></div>`;
   return h;
