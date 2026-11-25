@@ -6,14 +6,17 @@
   --btn-line: #D3C8B7; --btn-ink: #4A433B; --err: #A3412E;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; background: var(--bg); color: var(--ink); }
+/* The page itself never scrolls or bounces: only the content area (.bd) scrolls, so the Ask bar and
+   tabs are an ordinary footer the phone can't leave floating mid-screen (iOS did that after zooming
+   or closing the keyboard). touch-action: manipulation turns off double-tap zoom; pinch still works. */
+html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; background: var(--bg); color: var(--ink); touch-action: manipulation; }
 body { font-family: Lato, system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; -webkit-text-size-adjust: 100%; }
 button, input { font-family: inherit; }
 button { cursor: pointer; }
 
-#app { position: relative; max-width: 480px; margin: 0 auto; min-height: 100vh; min-height: 100dvh; }
-.bd { padding: calc(22px + env(safe-area-inset-top)) 18px calc(90px + env(safe-area-inset-bottom)); }
-.bd.nobar { padding-bottom: 32px; }
+#app { position: relative; max-width: 480px; margin: 0 auto; height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+.bd { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: calc(22px + env(safe-area-inset-top)) 18px 28px; }
+.bd.nobar { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
 
 /* Lora for dish names and other serif text; Cormorant only for page titles and section headings. */
 .sf { font-family: Lora, Georgia, serif; font-weight: 500; }
@@ -55,7 +58,7 @@ button { cursor: pointer; }
 .bar > div { height: 5px; background: var(--sage); }
 .banner { background: #F8EDE6; border: 1px solid #E7CDBD; color: #7A4632; border-radius: 12px; padding: 10px 12px; margin-bottom: 12px; font-size: 13px; }
 
-.tb { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; max-width: 480px; margin: 0 auto; display: flex; border-top: 1px solid var(--rule); background: var(--card); padding-bottom: env(safe-area-inset-bottom); }
+.tb { flex: none; z-index: 5; display: flex; border-top: 1px solid var(--rule); background: var(--card); padding-bottom: env(safe-area-inset-bottom); }
 .tb:empty { display: none; }
 .tb button { flex: 1; border: none; background: transparent; font-size: 12px; color: var(--faint); padding: 10px 0 12px; display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .tb button.a { color: var(--ink); }
@@ -107,12 +110,11 @@ button.thumb { background: var(--card); }
 .sw.on::after { left: 19px; }
 
 /* The Ask bar (phase 4): a bar above the tabs, opening a tall results sheet. */
-.dock { position: fixed; left: 0; right: 0; z-index: 5; max-width: 480px; margin: 0 auto; padding: 8px 14px; background: var(--bg); }
+.dock { flex: none; z-index: 5; padding: 8px 14px; background: var(--bg); }
 .dock:empty { display: none; }
 .askbar { display: flex; width: 100%; align-items: center; gap: 8px; background: var(--card); border: 1px solid #D9CDB8; border-radius: 999px; padding: 6px 6px 6px 14px; color: #7F7569; font-size: 15px; text-align: left; }
 .askbar > span { flex: 1; }
 .askbar > .ti { color: #8A7B63; font-size: 17px; }
-.bd.withask { padding-bottom: calc(150px + env(safe-area-inset-bottom)); }
 .round { width: 36px; height: 36px; border-radius: 50%; border: 1px solid #DCD3C5; background: transparent; color: #5E564C; display: inline-flex; align-items: center; justify-content: center; flex: none; padding: 0; }
 .round.dk { background: var(--ink); border-color: var(--ink); color: var(--bg); }
 .round:disabled { opacity: .4; cursor: default; }
@@ -137,7 +139,7 @@ button.thumb { background: var(--card); }
 .rate .ti { color: #C9A227; font-size: 15px; }
 
 /* Cook mode (phase 5): one step per screen, large type, the nav pinned to the bottom. */
-.bd.cook { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+.bd.cook { display: flex; flex-direction: column; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
 .cook-prog { display: flex; gap: 4px; margin: 12px 0 20px; }
 .cook-prog > div { flex: 1; height: 4px; border-radius: 2px; background: var(--rule); }
 .cook-prog > div.on { background: var(--sage); }

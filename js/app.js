@@ -42,6 +42,9 @@ const LEFTOVER_DAYS = [3, 7, 5, 1, 6, 2, 4];
 
 function refresh() { M = assemble(rows); }
 
+// Only the content area scrolls (see html, body in app.css), so "back to the top" scrolls it, not the window.
+function toTop() { $('body').scrollTop = 0; }
+
 // The Ask bar's spot above the tabs. Made here if the page doesn't have it: right after an update a
 // phone can still have the old index.html cached for a few minutes.
 function dockEl() {
@@ -80,7 +83,6 @@ function render() {
   const ctx = askCtx();
   if (ctx) {
     $('dock').innerHTML = vAskBar(ctx);
-    $('dock').style.bottom = $('tabs').offsetHeight + 'px';
     body.classList.add('withask');
   }
   if (S.tab === 'recipes' && S.recipe) loadPhotos(M.recipeById.get(S.recipe));
@@ -583,7 +585,7 @@ function resyncRecipe(recipeId) {
   plans.forEach(id => { if (!M.weeks.find(w => w.id === id)?.past) syncList(id); });
 }
 
-function openRecipe(id) { S.tab = 'recipes'; S.recipe = id; S.edit = null; S.add = null; window.scrollTo(0, 0); }
+function openRecipe(id) { S.tab = 'recipes'; S.recipe = id; S.edit = null; S.add = null; toTop(); }
 
 // Deleting waits a few seconds so Undo can bring it back; then the recipe goes for good.
 // Its ingredients and picks go with it (the database cascades); nights that used it open up
@@ -698,7 +700,7 @@ async function saveShared(toPicks) {
 }
 
 const ACTIONS = {
-  tab: v => { S.tab = v; S.add = null; S.viewPhoto = null; if (S.ask) closeAsk(); S.recipe = null; S.edit = null; S.page = null; S.swiped = null; window.scrollTo(0, 0); if (v === 'settings') loadSpent(); },
+  tab: v => { S.tab = v; S.add = null; S.viewPhoto = null; if (S.ask) closeAsk(); S.recipe = null; S.edit = null; S.page = null; S.swiped = null; toTop(); if (v === 'settings') loadSpent(); },
   rmphoto: i => { S.add.photos.splice(Number(i), 1); },
   rmmany: i => { S.many.splice(Number(i), 1); if (!S.many.length) S.many = null; },
   // The Ask sheet's buttons (js/views/ask.js)
@@ -789,7 +791,7 @@ const ACTIONS = {
     tickTimers();
   },
   cooktreset: k => { delete S.cook.timers[k]; },
-  cookgo: i => { S.cook.step = Number(i); window.scrollTo(0, 0); },
+  cookgo: i => { S.cook.step = Number(i); toTop(); },
   cookrate: v => {
     S.cook.rate = v;
     persist('recipes', S.cook.id, { rating: v === 'up' ? 5 : 1 }); // shown as stars in the box; Ask sees it when planning
@@ -806,13 +808,13 @@ function startCook() {
   S.cook = { id: r.id, step: 0, portions, factor: portions / base, timers: {}, rate: null, awake: false, all: false };
   history.pushState({ cook: 1 }, ''); // the phone's back gesture leaves cook mode, not the app
   keepAwake();
-  window.scrollTo(0, 0);
+  toTop();
 }
 function endCook() {
   S.cook = null;
   wakeLock?.release().catch(() => {}); wakeLock = null;
   clearInterval(tick); tick = null;
-  window.scrollTo(0, 0);
+  toTop();
 }
 // Keeps the screen on while cooking (Wake Lock API). Phones drop the lock when the app is hidden,
 // so it's asked for again when the app comes back.
@@ -892,13 +894,13 @@ const A = {
   moveforce: () => moveMeal(S.moveWarn.from, S.moveWarn.to, true),
   cookstart: () => startCook(),
   cookexit: () => { const back = history.state?.cook; endCook(); if (back) history.back(); },
-  cookprev: () => { S.cook.step = Math.max(0, S.cook.step - 1); window.scrollTo(0, 0); },
-  cooknext: () => { S.cook.step = Math.min(cookSteps().length, S.cook.step + 1); window.scrollTo(0, 0); },
+  cookprev: () => { S.cook.step = Math.max(0, S.cook.step - 1); toTop(); },
+  cooknext: () => { S.cook.step = Math.min(cookSteps().length, S.cook.step + 1); toTop(); },
   cookall: () => { S.cook.all = true; },
   cookallclose: () => { S.cook.all = false; },
   portm: () => { const r = M.recipeById.get(S.recipe); S.portions[r.id] = Math.max(1, (S.portions[r.id] || basePortions(M, r)) - 1); },
   portp: () => { const r = M.recipeById.get(S.recipe); S.portions[r.id] = Math.min(48, (S.portions[r.id] || basePortions(M, r)) + 1); },
-  tolist: () => { S.tab = 'list'; window.scrollTo(0, 0); },
+  tolist: () => { S.tab = 'list'; toTop(); },
   startweek: () => { startWeek(S.week); S.toast = 'Week started. Add a dinner to each open night.'; },
   leftovers: () => setMeal(S.add.mealId, { recipe_id: null, leftovers: true }, day => `${day} is a leftovers night.`),
   typego: () => {
@@ -966,9 +968,9 @@ const A = {
   tp: () => setHousehold({ time_limit_min: Math.min(240, Number(M.hh.time_limit_min) + 5) }),
   lom: () => setLeftovers(M.hh.leftovers_per_week - 1),
   lop: () => setLeftovers(M.hh.leftovers_per_week + 1),
-  openusuals: () => { S.page = 'usuals'; S.setErr = ''; window.scrollTo(0, 0); },
-  openskip: () => { S.page = 'skip'; S.setErr = ''; window.scrollTo(0, 0); },
-  opensites: () => { S.page = 'sites'; S.setErr = ''; window.scrollTo(0, 0); },
+  openusuals: () => { S.page = 'usuals'; S.setErr = ''; toTop(); },
+  openskip: () => { S.page = 'skip'; S.setErr = ''; toTop(); },
+  opensites: () => { S.page = 'sites'; S.setErr = ''; toTop(); },
   addsite: () => {
     const s = S.newSite.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0];
     const list = M.hh.recipe_sites || [];
