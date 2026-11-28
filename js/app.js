@@ -45,6 +45,27 @@ function refresh() { M = assemble(rows); }
 // Only the content area scrolls (see html, body in app.css), so "back to the top" scrolls it, not the window.
 function toTop() { $('body').scrollTop = 0; }
 
+// iOS still scrolls the page itself to show a focused field or after the photo picker, even though
+// the page can't scroll. With overflow hidden it never scrolls back: everything stays shifted up
+// (the title tucked under the status bar) and taps on sheet buttons land in the wrong place, so
+// "Save to recipe box" or "Read it" seem dead. Put the page back once no field is being typed in.
+function unshift() {
+  const typing = document.activeElement?.matches?.('input:not([type=file]), textarea, select');
+  if (typing) return;
+  if (window.scrollY || document.documentElement.scrollTop || document.body.scrollTop) {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }
+}
+const unshiftSoon = () => setTimeout(unshift, 60);
+document.addEventListener('focusout', unshiftSoon);
+window.visualViewport?.addEventListener('resize', unshiftSoon);
+window.visualViewport?.addEventListener('scroll', unshiftSoon);
+window.addEventListener('scroll', unshiftSoon);
+window.addEventListener('focus', unshiftSoon);         // back from the photo picker or camera
+document.addEventListener('visibilitychange', unshiftSoon);
+
 // The Ask bar's spot above the tabs. Made here if the page doesn't have it: right after an update a
 // phone can still have the old index.html cached for a few minutes.
 function dockEl() {
